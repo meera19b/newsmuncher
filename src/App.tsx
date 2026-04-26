@@ -2231,7 +2231,7 @@ function NewsDetailScreen({
       {/* Shorts / Timeline */}
       <div className="detail-actions">
         {onTimeline && (
-          <button type="button" className="detail-action-btn" onClick={onTimeline}>
+          <button type="button" className="detail-action-btn detail-action-btn--timeline" onClick={onTimeline}>
             <IconChronology />
             Timeline
           </button>

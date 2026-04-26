@@ -3088,6 +3088,14 @@
   color: var(--blue);
 }
 
+.detail-action-btn--timeline {
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, var(--green), var(--blue), #6366f1) border-box;
+  color: var(--green);
+}
+
 /* Detail header state */
 .header--detail .logo {
   display: flex;
@@ -4400,7 +4408,7 @@
   justify-content: center;
   align-items: center;
   margin-bottom: 24px;
-  background: #fff;
+  background: var(--surface);
   overflow: hidden;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -5338,7 +5346,7 @@
    Theme picker sheet
 —————————————————————————————————————— */
 .theme-sheet {
-  max-height: 80dvh;
+  max-height: 88dvh;
 }
 
 .theme-sheet__body {
@@ -5720,6 +5728,34 @@ html[data-theme='vintage'] .feed-card__dek {
   text-shadow: 0 1px 1px rgba(244, 232, 200, 0.6);
 }
 
+/* —— Selection / highlight overlays —— */
+html[data-theme='vintage'] .detail-para--highlighted {
+  background: var(--blue-soft);
+}
+html[data-theme='vintage'] .bm-word-mark {
+  background: color-mix(in srgb, var(--blue) 22%, var(--surface));
+  color: var(--text);
+}
+html[data-theme='vintage'] .sel-popup {
+  background: var(--blue);
+  color: #fff8e6;
+  font-family: var(--vintage-serif);
+}
+html[data-theme='vintage'] .sel-popup::after {
+  border-top-color: var(--blue);
+}
+html[data-theme='vintage'] .detail-action-btn--timeline {
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, var(--blue), #b45309, var(--green)) border-box;
+  color: var(--blue);
+}
+
+/* Quiz illustration backdrop in vintage stays parchment */
+html[data-theme='vintage'] .quiz-image-wrap {
+  background: var(--surface);
+}
+
 /* ——————————————————————————————————————
    Theme: Anime — teal pastels with anime texture
 —————————————————————————————————————— */
@@ -5939,6 +5975,42 @@ html[data-theme='anime'] .feed-card__read {
 html[data-theme='anime'] .feed-card__dek {
   color: var(--text);
   text-shadow: none;
+}
+
+/* —— Selection / highlight overlays —— */
+html[data-theme='anime'] .detail-para--highlighted {
+  background: var(--blue-soft);
+  color: var(--text);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.25);
+}
+html[data-theme='anime'] .bm-word-mark {
+  background: var(--green);
+  color: #1a0b3a;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+html[data-theme='anime'] .sel-popup {
+  background: linear-gradient(135deg, #ec4899 0%, #7c3aed 100%);
+  color: #fff;
+  border: 1.5px solid #fbbf24;
+  font-family: var(--anime-display);
+  letter-spacing: 0.04em;
+  box-shadow: 0 0 0 2px #1a0b3a, 0 8px 22px -6px rgba(236, 72, 153, 0.65);
+}
+html[data-theme='anime'] .sel-popup::after {
+  border-top-color: #7c3aed;
+}
+html[data-theme='anime'] .detail-action-btn--timeline {
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, #fbbf24, #ec4899, #7c3aed) border-box;
+  color: var(--green);
+}
+
+/* Light backdrop so dark-on-light editorial illustrations stay legible */
+html[data-theme='anime'] .quiz-image-wrap {
+  background: #fef3c7;
+  border-color: var(--border);
 }
 
 /* ——————————————————————————————————————
@@ -6215,6 +6287,58 @@ html[data-theme='cartoon'] .feed-card__dek {
   color: var(--text);
   font-family: var(--cartoon-body);
   text-shadow: none;
+}
+
+/* —— Selection / highlight overlays —— */
+html[data-theme='cartoon'] .detail-para--highlighted {
+  background: #fef3c7;
+  color: var(--text);
+  box-shadow: 0 0 0 1.5px var(--border), 3px 3px 0 var(--border);
+  border-radius: 10px;
+}
+html[data-theme='cartoon'] .bm-word-mark {
+  background: #fde047;
+  color: #1f1300;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 3px;
+}
+html[data-theme='cartoon'] .sel-popup {
+  background: linear-gradient(135deg, #fde047 0%, #f59e0b 60%, #f97316 100%);
+  color: #1f1300;
+  border: 1.5px solid var(--border);
+  font-family: var(--cartoon-display);
+  letter-spacing: 0.04em;
+  box-shadow: 3px 3px 0 var(--border);
+}
+html[data-theme='cartoon'] .sel-popup::after {
+  border-top-color: #f59e0b;
+}
+html[data-theme='cartoon'] .detail-action-btn--timeline {
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(135deg, #fde047, #f59e0b, #f97316) border-box;
+  color: #1f1300;
+  font-family: var(--cartoon-display);
+  letter-spacing: 0.02em;
+}
+html[data-theme='cartoon'] .detail-action-btn--quiz,
+html[data-theme='cartoon'] .detail-action-btn--opinions,
+html[data-theme='cartoon'] .detail-action-btn--impact {
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    linear-gradient(135deg, #fde047, #f59e0b, #f97316) border-box;
+  color: #1f1300;
+  font-family: var(--cartoon-display);
+  letter-spacing: 0.02em;
+}
+
+/* Quiz illustration backdrop pops on cartoon white */
+html[data-theme='cartoon'] .quiz-image-wrap {
+  background: #ffffff;
+  border-color: var(--border);
+  border-top-width: 2px;
+  border-bottom-width: 2px;
 }
 
 /* ——————————————————————————————————————
