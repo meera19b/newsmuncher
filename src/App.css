@@ -6226,18 +6226,6 @@ html[data-theme='cartoon'] img {
   filter: saturate(1.15) contrast(1.04);
 }
 
-/* Theme picker preview swatch */
-.theme-tile--cartoon .theme-tile__name,
-.theme-tile--cartoon .theme-tile__desc {
-  font-family: 'Lilita One', 'Fredoka', system-ui, sans-serif;
-  letter-spacing: 0.01em;
-}
-
-.theme-tile--cartoon {
-  background: linear-gradient(135deg, #fffbe6 0%, #fde047 100%);
-  border-color: #1f1300;
-}
-
 /* —— For You swipe feed: sunny halftone backdrop + sticker cards —— */
 html[data-theme='cartoon'] .feed-screen {
   background:
