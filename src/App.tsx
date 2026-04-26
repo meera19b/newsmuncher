@@ -5321,9 +5321,9 @@ function RegionSheet({
 }
 
 /* ——————————————————————————————————————
-   Themes — default / vintage / custom / anime
+   Themes — default / vintage / custom / anime / cartoon
 —————————————————————————————————————— */
-type ThemeId = 'default' | 'vintage' | 'custom' | 'anime'
+type ThemeId = 'default' | 'vintage' | 'custom' | 'anime' | 'cartoon'
 
 type CustomPalette = {
   id: string
@@ -5353,7 +5353,7 @@ function useTheme() {
   const [theme, setThemeState] = useState<ThemeId>(() => {
     try {
       const saved = localStorage.getItem(THEME_KEY)
-      if (saved === 'default' || saved === 'vintage' || saved === 'custom' || saved === 'anime') return saved
+      if (saved === 'default' || saved === 'vintage' || saved === 'custom' || saved === 'anime' || saved === 'cartoon') return saved
     } catch { /* ignore */ }
     return 'default'
   })
@@ -5412,6 +5412,7 @@ const THEME_OPTIONS: { id: ThemeId; name: string; description: string }[] = [
   { id: 'vintage', name: 'Vintage', description: 'Warm parchment, retro print feel' },
   { id: 'custom',  name: 'Custom',  description: 'Pick a palette that fits your mood' },
   { id: 'anime',   name: 'Anime',   description: 'Teal pastels with anime texture' },
+  { id: 'cartoon', name: 'Cartoon', description: 'Sunny yellow & white, comic-book pop' },
 ]
 
 function MenuSheet({
