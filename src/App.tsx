@@ -2042,6 +2042,7 @@ function NewsDetailScreen({
     }
   }, [audioSpeed, isAudioPlaying, startAudio, audioProgress, paragraphs])
 
+/*
   const skipAudio = useCallback((dir: 'fwd' | 'back') => {
     const fullText = paragraphs.join('. ')
     const step = Math.floor(fullText.length * 0.05) // skip 5%
@@ -2053,12 +2054,15 @@ function NewsDetailScreen({
     setAudioProgress((newPos / fullText.length) * 100)
     startAudio(newPos)
   }, [audioProgress, paragraphs, startAudio])
+*/
 
+/*
   const stopAudio = useCallback(() => {
     window.speechSynthesis.cancel()
     setIsAudioPlaying(false)
     setAudioProgress(0)
   }, [])
+*/
 
   const closeAudio = useCallback(() => {
     window.speechSynthesis.cancel()
@@ -4076,6 +4080,7 @@ function IconPauseLarge() {
   )
 }
 
+/*
 function IconSkipBack() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -4083,7 +4088,9 @@ function IconSkipBack() {
     </svg>
   )
 }
+*/
 
+/*
 function IconSkipForward() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -4091,7 +4098,9 @@ function IconSkipForward() {
     </svg>
   )
 }
+*/
 
+/*
 function IconStop() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -4099,6 +4108,7 @@ function IconStop() {
     </svg>
   )
 }
+*/
 
 function IconHome({ active }: { active?: boolean }) {
   const w = active ? 2.2 : 2
