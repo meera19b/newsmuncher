@@ -1272,7 +1272,7 @@ function ArticleQuiz({ story, onClosePanel: _onClosePanel }: { story: Story; onC
 
           <div className="quiz-image-wrap">
             <img 
-              src={`/quiz_editorial_${(currentIdx % 3) + 1}.png`} 
+              src={`${import.meta.env.BASE_URL}quiz_editorial_${(currentIdx % 3) + 1}.png`}
               alt="Editorial illustration" 
               className="quiz-image" 
             />
