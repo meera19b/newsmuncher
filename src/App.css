@@ -4249,6 +4249,42 @@
 .sub-screen--opinions { background: linear-gradient(180deg, #f8fafc 0%, var(--bg) 280px); }
 .sub-screen--impact   { background: linear-gradient(180deg, #fff7ed 0%, var(--bg) 280px); }
 
+/* Article-title context bar — keeps continuity with the news detail screen */
+.sub-screen__context {
+  margin: 12px 16px 0;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--blue);
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  /* Two-line clamp on the wrapping <p>, then truncate */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  text-overflow: ellipsis;
+}
+
+.sub-screen__context-label {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+  opacity: 0.85;
+}
+
 /* Drop the inline-card container styles inside the sub-screen body */
 .sub-screen__body > .quiz-wrap,
 .sub-screen__body > .opinions-wrap,
@@ -4259,6 +4295,15 @@
   background: transparent;
   box-shadow: none;
   padding: 24px 16px 64px;
+}
+
+/* When the context bar precedes the wrap, anchor the wrap to the top
+   so the screen reads top-to-bottom without an awkward auto-centered gap. */
+.sub-screen__context + .quiz-wrap,
+.sub-screen__context + .opinions-wrap,
+.sub-screen__context + .impact-wrap {
+  margin-top: 0;
+  padding-top: 14px;
 }
 
 .quiz-wrap {
@@ -5778,6 +5823,19 @@ html[data-theme='vintage'] {
   --insights-grad-end: #b45309;
 }
 
+/* Article-title context bar */
+html[data-theme='vintage'] .sub-screen__context {
+  font-family: var(--vintage-serif);
+  font-style: italic;
+  border-left-color: var(--blue);
+}
+html[data-theme='vintage'] .sub-screen__context-label {
+  font-style: normal;
+  font-variant: small-caps;
+  letter-spacing: 0.1em;
+  color: var(--blue);
+}
+
 /* ——————————————————————————————————————
    Theme: Anime — teal pastels with anime texture
 —————————————————————————————————————— */
@@ -6072,6 +6130,20 @@ html[data-theme='anime'] .insight-item__bullet {
 html[data-theme='anime'] {
   --insights-grad-start: #fbbf24;
   --insights-grad-end: #ec4899;
+}
+
+/* Article-title context bar */
+html[data-theme='anime'] .sub-screen__context {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-left: 3px solid var(--green);
+  color: var(--text);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.18);
+}
+html[data-theme='anime'] .sub-screen__context-label {
+  color: var(--green);
+  font-family: var(--anime-display);
+  letter-spacing: 0.1em;
 }
 
 /* ——————————————————————————————————————
@@ -6427,6 +6499,21 @@ html[data-theme='cartoon'] .insight-item__bullet {
 html[data-theme='cartoon'] {
   --insights-grad-start: #f59e0b;
   --insights-grad-end: #f97316;
+}
+
+/* Article-title context bar */
+html[data-theme='cartoon'] .sub-screen__context {
+  background: #ffffff;
+  border: 2px solid var(--border);
+  border-left: 4px solid #f59e0b;
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--border);
+  font-family: var(--cartoon-body);
+}
+html[data-theme='cartoon'] .sub-screen__context-label {
+  color: #1f1300;
+  font-family: var(--cartoon-display);
+  letter-spacing: 0.08em;
 }
 
 /* ——————————————————————————————————————

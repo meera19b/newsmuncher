@@ -1787,7 +1787,13 @@ function DetailSubScreen({
         </div>
         <div style={{ width: 44 }} />
       </header>
-      <div className="sub-screen__body">{children}</div>
+      <div className="sub-screen__body">
+        <p className="sub-screen__context" title={story.title}>
+          <span className="sub-screen__context-label">From the story</span>
+          {story.title}
+        </p>
+        {children}
+      </div>
     </div>,
     document.body,
   )
