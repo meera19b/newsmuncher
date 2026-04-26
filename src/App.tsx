@@ -4028,8 +4028,8 @@ function IconInsightsList() {
     <svg width="22" height="22" viewBox="0 0 512 512" fill="none" aria-hidden>
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#38bdf8" />
-          <stop offset="100%" stopColor="#818cf8" />
+          <stop offset="0%" stopColor="var(--insights-grad-start, #38bdf8)" />
+          <stop offset="100%" stopColor="var(--insights-grad-end, #818cf8)" />
         </linearGradient>
       </defs>
       <circle cx="80" cy="112" r="64" fill={`url(#${gradId})`} />

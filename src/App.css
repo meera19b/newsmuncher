@@ -2952,8 +2952,8 @@
 .insights-panel {
   margin: 4px 16px 24px;
   padding: 20px;
-  background: #fff;
-  border: 1px solid rgba(8, 145, 178, 0.12);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 24px;
   box-shadow: 0 4px 18px rgba(3, 105, 161, 0.05);
   display: flex;
@@ -3017,8 +3017,8 @@
   height: 6px;
   margin-top: 6px;
   border-radius: 50%;
-  background: #0891b2;
-  box-shadow: 0 0 10px rgba(8, 145, 178, 0.4);
+  background: var(--blue);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--blue) 40%, transparent);
 }
 
 .insight-item__content {
@@ -5756,6 +5756,28 @@ html[data-theme='vintage'] .quiz-image-wrap {
   background: var(--surface);
 }
 
+/* —— Sub-screen (Trivia / Opinions / Impact) header & accents —— */
+html[data-theme='vintage'] .sub-screen__header {
+  background: rgba(244, 232, 200, 0.92);
+  border-bottom-color: var(--border);
+}
+html[data-theme='vintage'] .sub-screen__title {
+  color: var(--text);
+  font-family: var(--vintage-serif);
+}
+html[data-theme='vintage'] .sub-screen--opinions {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 280px);
+}
+html[data-theme='vintage'] .sub-screen--impact {
+  background: linear-gradient(180deg, var(--blue-soft) 0%, var(--bg) 280px);
+}
+
+/* Insights icon gradient stops */
+html[data-theme='vintage'] {
+  --insights-grad-start: #8a1818;
+  --insights-grad-end: #b45309;
+}
+
 /* ——————————————————————————————————————
    Theme: Anime — teal pastels with anime texture
 —————————————————————————————————————— */
@@ -6011,6 +6033,45 @@ html[data-theme='anime'] .detail-action-btn--timeline {
 html[data-theme='anime'] .quiz-image-wrap {
   background: #fef3c7;
   border-color: var(--border);
+}
+
+/* —— Sub-screen header & accents —— */
+html[data-theme='anime'] .sub-screen__header {
+  background: rgba(22, 10, 46, 0.86);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(251, 191, 36, 0.35);
+}
+html[data-theme='anime'] .sub-screen__title {
+  color: var(--text);
+  font-family: var(--anime-display);
+  text-shadow: 1.5px 1.5px 0 var(--blue-soft);
+  letter-spacing: 0.02em;
+}
+html[data-theme='anime'] .sub-screen--opinions {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 280px);
+}
+html[data-theme='anime'] .sub-screen--impact {
+  background: linear-gradient(180deg, #2a1452 0%, var(--bg) 280px);
+}
+
+/* Insights panel & icon */
+html[data-theme='anime'] .insights-panel {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.18),
+    0 14px 32px -14px rgba(236, 72, 153, 0.55);
+}
+html[data-theme='anime'] .insight-item__label {
+  color: var(--green);
+}
+html[data-theme='anime'] .insight-item__bullet {
+  background: var(--green);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.55);
+}
+html[data-theme='anime'] {
+  --insights-grad-start: #fbbf24;
+  --insights-grad-end: #ec4899;
 }
 
 /* ——————————————————————————————————————
@@ -6327,6 +6388,45 @@ html[data-theme='cartoon'] .quiz-image-wrap {
   border-color: var(--border);
   border-top-width: 2px;
   border-bottom-width: 2px;
+}
+
+/* —— Sub-screen header & accents —— */
+html[data-theme='cartoon'] .sub-screen__header {
+  background: rgba(255, 251, 230, 0.92);
+  border-bottom: 2px solid var(--border);
+  box-shadow: 0 3px 0 var(--border);
+}
+html[data-theme='cartoon'] .sub-screen__title {
+  color: var(--text);
+  font-family: var(--cartoon-display);
+  letter-spacing: 0.01em;
+  text-shadow: 2px 2px 0 #fde047;
+}
+html[data-theme='cartoon'] .sub-screen--opinions {
+  background: linear-gradient(180deg, #fef3c7 0%, var(--bg) 280px);
+}
+html[data-theme='cartoon'] .sub-screen--impact {
+  background: linear-gradient(180deg, #ffedd5 0%, var(--bg) 280px);
+}
+
+/* Insights panel & icon */
+html[data-theme='cartoon'] .insights-panel {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 4px 4px 0 var(--border);
+}
+html[data-theme='cartoon'] .insight-item__label {
+  font-family: var(--cartoon-display);
+  letter-spacing: 0.005em;
+}
+html[data-theme='cartoon'] .insight-item__bullet {
+  background: #f97316;
+  box-shadow: 0 0 0 2px var(--border);
+}
+html[data-theme='cartoon'] {
+  --insights-grad-start: #f59e0b;
+  --insights-grad-end: #f97316;
 }
 
 /* ——————————————————————————————————————
