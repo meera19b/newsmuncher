@@ -1631,9 +1631,11 @@
   font-size: 0.95rem;
   line-height: 1.55;
   display: block;
-  -webkit-line-clamp: unset;
-  line-clamp: unset;
+  flex: 0 1 auto;
+  min-height: 0;
   overflow: visible;
+  -webkit-mask-image: none;
+          mask-image: none;
 }
 
 .feed-card--focused .feed-card__cta-row {
@@ -1661,13 +1663,14 @@
   font-size: 0.88rem;
   color: var(--text);
   line-height: 1.5;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
+  display: block;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   text-shadow: none;
+  /* Fade the last 24px so the truncation reads as intentional */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
 }
 
 .feed-card__read {
