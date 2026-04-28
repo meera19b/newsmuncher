@@ -5413,6 +5413,72 @@ function IconMenu() {
   )
 }
 
+/* ——————————————————————————————————————
+   Brand — Newsmuncher (default) / bitstale (trial)
+—————————————————————————————————————— */
+type BrandId = 'newsmuncher' | 'bitstale'
+
+const BRAND_KEY = 'nm_brand_v1'
+
+const BRANDS: { id: BrandId; name: string; description: string }[] = [
+  { id: 'newsmuncher', name: 'Newsmuncher', description: 'Original wordmark' },
+  { id: 'bitstale',    name: 'bitstale',    description: 'Trial: lightning-Z mark' },
+]
+
+function useBrand() {
+  const [brand, setBrandState] = useState<BrandId>(() => {
+    try {
+      const saved = localStorage.getItem(BRAND_KEY)
+      if (saved === 'newsmuncher' || saved === 'bitstale') return saved
+    } catch { /* ignore */ }
+    return 'newsmuncher'
+  })
+
+  useEffect(() => {
+    document.title = brand === 'bitstale' ? 'bitstale' : 'Newsmuncher'
+  }, [brand])
+
+  const setBrand = useCallback((b: BrandId) => {
+    setBrandState(b)
+    try { localStorage.setItem(BRAND_KEY, b) } catch { /* ignore */ }
+  }, [])
+
+  return { brand, setBrand }
+}
+
+/** Lightning-Z glyph lifted from /public/favicon.svg, simplified for inline use. */
+function BitstaleMark({ size = 22 }: { size?: number }) {
+  const uid = useId().replace(/:/g, '')
+  const gradId = `bitstale-grad-${uid}`
+  return (
+    <svg width={size} height={size * (46 / 48)} viewBox="0 0 48 46" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#a855f7" />
+          <stop offset="55%" stopColor="#7e14ff" />
+          <stop offset="100%" stopColor="#47bfff" />
+        </linearGradient>
+      </defs>
+      <path
+        fill={`url(#${gradId})`}
+        d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z"
+      />
+    </svg>
+  )
+}
+
+function BrandLogo({ brand }: { brand: BrandId }) {
+  if (brand === 'bitstale') {
+    return (
+      <h1 className="logo logo--bitstale" aria-label="bitstale">
+        <span className="logo-bitstale__icon"><BitstaleMark /></span>
+        <span className="logo-bitstale__word">bitstale</span>
+      </h1>
+    )
+  }
+  return <h1 className="logo">Newsmuncher</h1>
+}
+
 const THEME_OPTIONS: { id: ThemeId; name: string; description: string }[] = [
   { id: 'default', name: 'Default', description: 'Clean, modern look' },
   { id: 'vintage', name: 'Vintage', description: 'Warm parchment, retro print feel' },
@@ -5426,6 +5492,8 @@ function MenuSheet({
   paletteId,
   onSelectTheme,
   onSelectPalette,
+  brand,
+  onSelectBrand,
   weather,
   regionName,
   onClose,
@@ -5434,6 +5502,8 @@ function MenuSheet({
   paletteId: string
   onSelectTheme: (t: ThemeId) => void
   onSelectPalette: (id: string) => void
+  brand: BrandId
+  onSelectBrand: (b: BrandId) => void
   weather: HeaderWeather
   regionName: string
   onClose: () => void
@@ -5461,6 +5531,35 @@ function MenuSheet({
               </div>
             </div>
           </section>
+          <section className="menu-section">
+            <p className="menu-section__label">Brand</p>
+            <div className="theme-grid" role="radiogroup" aria-label="Brand">
+              {BRANDS.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={brand === b.id}
+                  className={`theme-tile theme-tile--brand-${b.id}${brand === b.id ? ' theme-tile--active' : ''}`}
+                  onClick={() => onSelectBrand(b.id)}
+                >
+                  <span className="theme-tile__brand-row">
+                    {b.id === 'bitstale' ? <BitstaleMark size={18} /> : null}
+                    <span className="theme-tile__name">{b.name}</span>
+                  </span>
+                  <span className="theme-tile__desc">{b.description}</span>
+                  {brand === b.id && (
+                    <span className="theme-tile__check" aria-hidden>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="5 12 10 17 19 7" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
+
           <section className="menu-section">
             <p className="menu-section__label">Theme</p>
           <div className="theme-grid" role="radiogroup" aria-label="Themes">
@@ -5579,6 +5678,7 @@ export default function App() {
   const { bookmarks, addBookmark, removeBookmark, isArticleBookmarked, toggleArticleBookmark, getTextBookmark } = useBookmarks()
   const { getReaction, setReaction, getRefinement, setRefinement } = useReactions()
   const { theme, setTheme, paletteId, setPaletteId } = useTheme()
+  const { brand, setBrand } = useBrand()
   const [showMenuSheet, setShowMenuSheet] = useState(false)
 
   const setHeroSlideRef = useCallback((index: number) => (el: HTMLDivElement | null) => {
@@ -5680,7 +5780,7 @@ export default function App() {
               >
                 <IconMenu />
               </button>
-              <h1 className="logo">Newsmuncher</h1>
+              <BrandLogo brand={brand} />
               <div className="header-actions">
                 <button
                   type="button"
@@ -5957,6 +6057,8 @@ export default function App() {
           paletteId={paletteId}
           onSelectTheme={setTheme}
           onSelectPalette={setPaletteId}
+          brand={brand}
+          onSelectBrand={setBrand}
           weather={headerWeather}
           regionName={selectedRegion.name}
           onClose={() => setShowMenuSheet(false)}
