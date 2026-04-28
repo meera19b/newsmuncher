@@ -294,43 +294,22 @@
   font-weight: 400;
   font-size: 1.18rem;
   letter-spacing: -0.01em;
+  /* Inherit the same blue → green gradient as the Newsmuncher wordmark on
+     default theme. Per-theme rules below paint a different gradient when
+     vintage / anime / cartoon is active. */
+  background: linear-gradient(120deg, var(--blue) 0%, var(--green) 100%);
   -webkit-background-clip: text;
           background-clip: text;
   color: transparent;
 }
 
-/* bitsTale — violet → cyan, lightning-Z mark */
-.logo--bitstale .logo-brand__icon {
-  filter: drop-shadow(0 1px 2px rgba(126, 20, 255, 0.35));
-}
-.logo--bitstale .logo-brand__word {
-  background-image: linear-gradient(110deg, #a855f7 0%, #7e14ff 45%, #47bfff 100%);
-}
-
-/* reporTale — amber → red, signal-bars mark */
-.logo--reportale .logo-brand__icon {
-  filter: drop-shadow(0 1px 2px rgba(220, 38, 38, 0.3));
-}
-.logo--reportale .logo-brand__word {
-  background-image: linear-gradient(110deg, #f97316 0%, #ea580c 50%, #dc2626 100%);
-}
-
-/* Snippeds — emerald → cyan, stacked-card mark */
-.logo--snippets .logo-brand__icon {
-  filter: drop-shadow(0 1px 2px rgba(8, 145, 178, 0.3));
-}
-.logo--snippets .logo-brand__word {
-  background-image: linear-gradient(110deg, #10b981 0%, #14b8a6 50%, #0891b2 100%);
-  letter-spacing: -0.005em;
-}
-
-/* TrueStory — indigo → fuchsia, verified-shield mark */
-.logo--truestory .logo-brand__icon {
-  filter: drop-shadow(0 1px 2px rgba(139, 92, 246, 0.35));
-}
-.logo--truestory .logo-brand__word {
-  background-image: linear-gradient(110deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
-}
+/* Brand-specific drop-shadow on the icon — the icon (and its own SVG
+   gradient) carries the brand identity; the wordmark color tracks the
+   active theme so the header reads cohesively. */
+.logo--bitstale  .logo-brand__icon { filter: drop-shadow(0 1px 2px rgba(126, 20, 255, 0.35)); }
+.logo--reportale .logo-brand__icon { filter: drop-shadow(0 1px 2px rgba(220, 38, 38, 0.3)); }
+.logo--snippets  .logo-brand__icon { filter: drop-shadow(0 1px 2px rgba(8, 145, 178, 0.3)); }
+.logo--truestory .logo-brand__icon { filter: drop-shadow(0 1px 2px rgba(139, 92, 246, 0.35)); }
 
 /* Brand mark icon glow per theme — wordmark gradient itself is themed by
    the unified .logo / .logo__word / .logo-brand__word / .app-footer__word
@@ -2218,27 +2197,6 @@ html[data-theme='anime'] .app-footer__icon {
   font-weight: 400;
   letter-spacing: -0.01em;
   -webkit-text-fill-color: transparent;
-}
-
-.app-footer--bitstale .app-footer__word {
-  background: linear-gradient(110deg, #a855f7 0%, #7e14ff 45%, #47bfff 100%);
-  -webkit-background-clip: text;
-          background-clip: text;
-}
-.app-footer--reportale .app-footer__word {
-  background: linear-gradient(110deg, #f97316 0%, #ea580c 50%, #dc2626 100%);
-  -webkit-background-clip: text;
-          background-clip: text;
-}
-.app-footer--snippets .app-footer__word {
-  background: linear-gradient(110deg, #10b981 0%, #14b8a6 50%, #0891b2 100%);
-  -webkit-background-clip: text;
-          background-clip: text;
-}
-.app-footer--truestory .app-footer__word {
-  background: linear-gradient(110deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
-  -webkit-background-clip: text;
-          background-clip: text;
 }
 
 .app-footer__tagline {
