@@ -332,25 +332,12 @@
   background-image: linear-gradient(110deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
 }
 
-/* Per-theme tweaks so trial brands feel native to the active palette */
-html[data-theme='vintage'] .logo--bitstale .logo-brand__word,
-html[data-theme='vintage'] .logo--reportale .logo-brand__word,
-html[data-theme='vintage'] .logo--snippets .logo-brand__word,
-html[data-theme='vintage'] .logo--truestory .logo-brand__word {
-  background-image: linear-gradient(110deg, #6b1414 0%, #8a1818 45%, #b45309 100%);
-}
-html[data-theme='anime'] .logo--bitstale .logo-brand__icon,
-html[data-theme='anime'] .logo--reportale .logo-brand__icon,
-html[data-theme='anime'] .logo--snippets .logo-brand__icon,
-html[data-theme='anime'] .logo--truestory .logo-brand__icon {
+/* Brand mark icon glow per theme — wordmark gradient itself is themed by
+   the unified .logo / .logo__word / .logo-brand__word / .app-footer__word
+   rules in each theme's block below. */
+html[data-theme='anime'] .logo--brand .logo-brand__icon,
+html[data-theme='anime'] .app-footer__icon {
   filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.55));
-}
-html[data-theme='cartoon'] .logo--bitstale .logo-brand__word,
-html[data-theme='cartoon'] .logo--reportale .logo-brand__word,
-html[data-theme='cartoon'] .logo--snippets .logo-brand__word,
-html[data-theme='cartoon'] .logo--truestory .logo-brand__word {
-  font-family: 'Lilita One', 'Russo One', system-ui, sans-serif;
-  -webkit-text-stroke: 0.5px #1f1300;
 }
 
 /* Brand picker tile: stack icon + name on the same row */
@@ -5889,11 +5876,17 @@ html[data-theme='vintage'] .bottom-nav {
 }
 
 html[data-theme='vintage'] .logo,
-html[data-theme='vintage'] .logo--with-tagline .logo__word {
+html[data-theme='vintage'] .logo--with-tagline .logo__word,
+html[data-theme='vintage'] .logo--brand .logo-brand__word,
+html[data-theme='vintage'] .app-footer__word {
   font-family: 'UnifrakturMaguntia', 'Pirata One', 'Cormorant Garamond', Georgia, serif;
   font-weight: 400;
   letter-spacing: 0.01em;
   color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  background: none;
+  -webkit-background-clip: initial;
+          background-clip: initial;
 }
 
 /* —— Vintage typography: serif headlines & body —— */
@@ -6161,7 +6154,9 @@ html[data-theme='anime'] .nav-item--active svg {
 
 /* Logo: dramatic comic-book emboss with yellow → magenta → cyan gradient */
 html[data-theme='anime'] .logo,
-html[data-theme='anime'] .logo--with-tagline .logo__word {
+html[data-theme='anime'] .logo--with-tagline .logo__word,
+html[data-theme='anime'] .logo--brand .logo-brand__word,
+html[data-theme='anime'] .app-footer__word {
   font-family: var(--anime-display-inline);
   font-weight: 400;
   letter-spacing: 0.02em;
@@ -6169,6 +6164,7 @@ html[data-theme='anime'] .logo--with-tagline .logo__word {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  -webkit-text-fill-color: transparent;
   -webkit-text-stroke: 1px #1a0b3a;
   filter:
     drop-shadow(2px 2px 0 #1a0b3a)
@@ -6476,7 +6472,9 @@ html[data-theme='cartoon'] .nav-item--active svg {
 
 /* Big bouncy logo with comic-book emboss */
 html[data-theme='cartoon'] .logo,
-html[data-theme='cartoon'] .logo--with-tagline .logo__word {
+html[data-theme='cartoon'] .logo--with-tagline .logo__word,
+html[data-theme='cartoon'] .logo--brand .logo-brand__word,
+html[data-theme='cartoon'] .app-footer__word {
   font-family: var(--cartoon-display);
   font-weight: 400;
   letter-spacing: 0.01em;
@@ -6484,6 +6482,7 @@ html[data-theme='cartoon'] .logo--with-tagline .logo__word {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  -webkit-text-fill-color: transparent;
   -webkit-text-stroke: 1.5px #1f1300;
   filter: drop-shadow(2px 2px 0 #1f1300);
 }
