@@ -5423,9 +5423,9 @@ const BRAND_KEY = 'nm_brand_v1'
 const BRANDS: { id: BrandId; name: string; description: string }[] = [
   { id: 'newsmuncher', name: 'Newsmuncher', description: 'Original wordmark' },
   { id: 'bitstale',    name: 'bitsTale',    description: 'Lightning-Z mark, byte vibe' },
-  { id: 'reportale',   name: 'reporTale',   description: 'Signal-bar mark, on-the-air feel' },
-  { id: 'snippets',    name: 'Snippets',    description: 'Stacked-card mark, quick reads' },
-  { id: 'truestory',   name: 'trueStory',   description: 'Verified-shield mark, trust angle' },
+  { id: 'reportale',   name: 'Reportale',   description: 'Signal-bar mark, on-the-air feel' },
+  { id: 'snippets',    name: 'Snippeds',    description: 'Stacked-card mark, quick reads' },
+  { id: 'truestory',   name: 'TrueStory',   description: 'Verified-shield mark, trust angle' },
 ]
 
 const BRAND_IDS: BrandId[] = ['newsmuncher', 'bitstale', 'reportale', 'snippets', 'truestory']
@@ -5544,9 +5544,9 @@ function TrueStoryMark({ size = 22 }: { size?: number }) {
 
 const BRAND_DISPLAY: Record<Exclude<BrandId, 'newsmuncher'>, { word: string; className: string; Mark: React.ComponentType<{ size?: number }> }> = {
   bitstale:  { word: 'bitsTale',  className: 'logo--bitstale',  Mark: BitstaleMark },
-  reportale: { word: 'reporTale', className: 'logo--reportale', Mark: ReporTaleMark },
-  snippets:  { word: 'Snippets',  className: 'logo--snippets',  Mark: SnippetsMark },
-  truestory: { word: 'trueStory', className: 'logo--truestory', Mark: TrueStoryMark },
+  reportale: { word: 'Reportale', className: 'logo--reportale', Mark: ReporTaleMark },
+  snippets:  { word: 'Snippeds',  className: 'logo--snippets',  Mark: SnippetsMark },
+  truestory: { word: 'TrueStory', className: 'logo--truestory', Mark: TrueStoryMark },
 }
 
 function BrandLogo({ brand }: { brand: BrandId }) {

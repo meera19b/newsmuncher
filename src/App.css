@@ -266,7 +266,7 @@
   background-image: linear-gradient(110deg, #f97316 0%, #ea580c 50%, #dc2626 100%);
 }
 
-/* Snippets — emerald → cyan, stacked-card mark */
+/* Snippeds — emerald → cyan, stacked-card mark */
 .logo--snippets .logo-brand__icon {
   filter: drop-shadow(0 1px 2px rgba(8, 145, 178, 0.3));
 }
@@ -275,20 +275,31 @@
   letter-spacing: -0.005em;
 }
 
+/* TrueStory — indigo → fuchsia, verified-shield mark */
+.logo--truestory .logo-brand__icon {
+  filter: drop-shadow(0 1px 2px rgba(139, 92, 246, 0.35));
+}
+.logo--truestory .logo-brand__word {
+  background-image: linear-gradient(110deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+}
+
 /* Per-theme tweaks so trial brands feel native to the active palette */
 html[data-theme='vintage'] .logo--bitstale .logo-brand__word,
 html[data-theme='vintage'] .logo--reportale .logo-brand__word,
-html[data-theme='vintage'] .logo--snippets .logo-brand__word {
+html[data-theme='vintage'] .logo--snippets .logo-brand__word,
+html[data-theme='vintage'] .logo--truestory .logo-brand__word {
   background-image: linear-gradient(110deg, #6b1414 0%, #8a1818 45%, #b45309 100%);
 }
 html[data-theme='anime'] .logo--bitstale .logo-brand__icon,
 html[data-theme='anime'] .logo--reportale .logo-brand__icon,
-html[data-theme='anime'] .logo--snippets .logo-brand__icon {
+html[data-theme='anime'] .logo--snippets .logo-brand__icon,
+html[data-theme='anime'] .logo--truestory .logo-brand__icon {
   filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.55));
 }
 html[data-theme='cartoon'] .logo--bitstale .logo-brand__word,
 html[data-theme='cartoon'] .logo--reportale .logo-brand__word,
-html[data-theme='cartoon'] .logo--snippets .logo-brand__word {
+html[data-theme='cartoon'] .logo--snippets .logo-brand__word,
+html[data-theme='cartoon'] .logo--truestory .logo-brand__word {
   font-family: 'Lilita One', 'Russo One', system-ui, sans-serif;
   -webkit-text-stroke: 0.5px #1f1300;
 }
