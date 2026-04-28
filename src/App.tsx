@@ -5416,20 +5416,25 @@ function IconMenu() {
 /* ——————————————————————————————————————
    Brand — Newsmuncher (default) / bitstale (trial)
 —————————————————————————————————————— */
-type BrandId = 'newsmuncher' | 'bitstale'
+type BrandId = 'newsmuncher' | 'bitstale' | 'reportale' | 'snippets' | 'truestory'
 
 const BRAND_KEY = 'nm_brand_v1'
 
 const BRANDS: { id: BrandId; name: string; description: string }[] = [
   { id: 'newsmuncher', name: 'Newsmuncher', description: 'Original wordmark' },
-  { id: 'bitstale',    name: 'bitstale',    description: 'Trial: lightning-Z mark' },
+  { id: 'bitstale',    name: 'bitsTale',    description: 'Lightning-Z mark, byte vibe' },
+  { id: 'reportale',   name: 'reporTale',   description: 'Signal-bar mark, on-the-air feel' },
+  { id: 'snippets',    name: 'Snippets',    description: 'Stacked-card mark, quick reads' },
+  { id: 'truestory',   name: 'trueStory',   description: 'Verified-shield mark, trust angle' },
 ]
+
+const BRAND_IDS: BrandId[] = ['newsmuncher', 'bitstale', 'reportale', 'snippets', 'truestory']
 
 function useBrand() {
   const [brand, setBrandState] = useState<BrandId>(() => {
     try {
       const saved = localStorage.getItem(BRAND_KEY)
-      if (saved === 'newsmuncher' || saved === 'bitstale') return saved
+      if (saved && (BRAND_IDS as string[]).includes(saved)) return saved as BrandId
     } catch { /* ignore */ }
     return 'newsmuncher'
   })
@@ -5467,16 +5472,94 @@ function BitstaleMark({ size = 22 }: { size?: number }) {
   )
 }
 
+/** Three signal bars + a pulse dot — a reporter's-on-the-air feel. */
+function ReporTaleMark({ size = 22 }: { size?: number }) {
+  const uid = useId().replace(/:/g, '')
+  const gradId = `reportale-grad-${uid}`
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#f97316" />
+          <stop offset="60%" stopColor="#ea580c" />
+          <stop offset="100%" stopColor="#dc2626" />
+        </linearGradient>
+      </defs>
+      <rect x="4"  y="22" width="6" height="22" rx="2" fill={`url(#${gradId})`} />
+      <rect x="14" y="14" width="6" height="30" rx="2" fill={`url(#${gradId})`} />
+      <rect x="24" y="6"  width="6" height="38" rx="2" fill={`url(#${gradId})`} />
+      <circle cx="40" cy="14" r="6" fill={`url(#${gradId})`} />
+    </svg>
+  )
+}
+
+/** Three stacked rounded rectangles — a deck-of-cards feel for short reads. */
+function SnippetsMark({ size = 22 }: { size?: number }) {
+  const uid = useId().replace(/:/g, '')
+  const gradId = `snippets-grad-${uid}`
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#10b981" />
+          <stop offset="55%" stopColor="#14b8a6" />
+          <stop offset="100%" stopColor="#0891b2" />
+        </linearGradient>
+      </defs>
+      <rect x="14" y="4"  width="28" height="28" rx="5" fill="none" stroke={`url(#${gradId})`} strokeWidth="3" opacity="0.45" />
+      <rect x="9"  y="9"  width="28" height="28" rx="5" fill="none" stroke={`url(#${gradId})`} strokeWidth="3" opacity="0.7" />
+      <rect x="4"  y="14" width="28" height="28" rx="5" fill={`url(#${gradId})`} />
+    </svg>
+  )
+}
+
+/** Shield-with-check — "verified true story" badge. */
+function TrueStoryMark({ size = 22 }: { size?: number }) {
+  const uid = useId().replace(/:/g, '')
+  const gradId = `truestory-grad-${uid}`
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden>
+      <defs>
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#6366f1" />
+          <stop offset="55%" stopColor="#8b5cf6" />
+          <stop offset="100%" stopColor="#d946ef" />
+        </linearGradient>
+      </defs>
+      <path
+        fill={`url(#${gradId})`}
+        d="M24 4 L8 10 V24 C8 34 14 41 24 44 C34 41 40 34 40 24 V10 Z"
+      />
+      <path
+        d="M15 24 L22 30 L33 18"
+        stroke="#fff"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  )
+}
+
+const BRAND_DISPLAY: Record<Exclude<BrandId, 'newsmuncher'>, { word: string; className: string; Mark: React.ComponentType<{ size?: number }> }> = {
+  bitstale:  { word: 'bitsTale',  className: 'logo--bitstale',  Mark: BitstaleMark },
+  reportale: { word: 'reporTale', className: 'logo--reportale', Mark: ReporTaleMark },
+  snippets:  { word: 'Snippets',  className: 'logo--snippets',  Mark: SnippetsMark },
+  truestory: { word: 'trueStory', className: 'logo--truestory', Mark: TrueStoryMark },
+}
+
 function BrandLogo({ brand }: { brand: BrandId }) {
-  if (brand === 'bitstale') {
-    return (
-      <h1 className="logo logo--bitstale" aria-label="bitstale">
-        <span className="logo-bitstale__icon"><BitstaleMark /></span>
-        <span className="logo-bitstale__word">bitstale</span>
-      </h1>
-    )
+  if (brand === 'newsmuncher') {
+    return <h1 className="logo">Newsmuncher</h1>
   }
-  return <h1 className="logo">Newsmuncher</h1>
+  const cfg = BRAND_DISPLAY[brand]
+  return (
+    <h1 className={`logo logo--brand ${cfg.className}`} aria-label={cfg.word}>
+      <span className="logo-brand__icon"><cfg.Mark /></span>
+      <span className="logo-brand__word">{cfg.word}</span>
+    </h1>
+  )
 }
 
 const THEME_OPTIONS: { id: ThemeId; name: string; description: string }[] = [
@@ -5544,7 +5627,10 @@ function MenuSheet({
                   onClick={() => onSelectBrand(b.id)}
                 >
                   <span className="theme-tile__brand-row">
-                    {b.id === 'bitstale' ? <BitstaleMark size={18} /> : null}
+                    {b.id !== 'newsmuncher' && (() => {
+                      const Mark = BRAND_DISPLAY[b.id as Exclude<BrandId, 'newsmuncher'>].Mark
+                      return <Mark size={18} />
+                    })()}
                     <span className="theme-tile__name">{b.name}</span>
                   </span>
                   <span className="theme-tile__desc">{b.description}</span>
