@@ -221,18 +221,67 @@
   color: transparent;
 }
 
-/* —— Trial brand logos (bitsTale / reporTale / Snippets) —— */
-.logo--brand {
+/* Logo with tagline: stack the wordmark and tagline vertically inside the
+   header. Used by Newsmuncher and every trial brand. */
+.logo--with-tagline {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  background: none;
+  -webkit-background-clip: initial;
+          background-clip: initial;
+  color: initial;
+  filter: none;
+  -webkit-text-stroke: 0;
+  line-height: 1;
+  gap: 1px;
+}
+
+.logo--with-tagline .logo__word {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  background: linear-gradient(120deg, var(--blue) 0%, var(--green) 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+}
+
+.logo__tagline {
+  font-size: 0.58rem;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+  background: none;
+  -webkit-background-clip: initial;
+          background-clip: initial;
+  -webkit-text-stroke: 0;
+  filter: none;
+  white-space: nowrap;
+  max-width: min(60vw, 280px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* —— Trial brand logos (bitsTale / Reportale / Snippeds / TrueStory) —— */
+.logo--brand {
   background: none;
   -webkit-background-clip: initial;
           background-clip: initial;
   color: initial;
   letter-spacing: 0;
   line-height: 1;
+}
+
+/* Inner row that holds the icon next to the wordmark */
+.logo-brand__row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
 }
 
 .logo-brand__icon {
@@ -2139,6 +2188,111 @@ html[data-theme='cartoon'] .logo--truestory .logo-brand__word {
   font-size: 0.88rem;
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+/* —— App footer (brand mark + tagline + links) —— */
+.app-footer {
+  margin: 36px 16px calc(var(--nav-h) + 24px);
+  padding: 28px 18px 22px;
+  border-top: 2px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-footer__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.app-footer__icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.app-footer__word {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  background: linear-gradient(120deg, var(--blue) 0%, var(--green) 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.app-footer--brand .app-footer__word {
+  font-family: 'Russo One', 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  -webkit-text-fill-color: transparent;
+}
+
+.app-footer--bitstale .app-footer__word {
+  background: linear-gradient(110deg, #a855f7 0%, #7e14ff 45%, #47bfff 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+}
+.app-footer--reportale .app-footer__word {
+  background: linear-gradient(110deg, #f97316 0%, #ea580c 50%, #dc2626 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+}
+.app-footer--snippets .app-footer__word {
+  background: linear-gradient(110deg, #10b981 0%, #14b8a6 50%, #0891b2 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+}
+.app-footer--truestory .app-footer__word {
+  background: linear-gradient(110deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+}
+
+.app-footer__tagline {
+  margin: 2px 0 0;
+  font-size: 0.86rem;
+  font-style: italic;
+  color: var(--text-muted);
+  max-width: 360px;
+  line-height: 1.4;
+}
+
+.app-footer__links {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.app-footer__links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.app-footer__links a:hover,
+.app-footer__links a:focus-visible {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+.app-footer__copy {
+  margin: 6px 0 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.75;
+  letter-spacing: 0.02em;
 }
 
 /* —— Insights: AI pattern outlook —— */
@@ -5734,7 +5888,8 @@ html[data-theme='vintage'] .bottom-nav {
   background: rgba(244, 232, 200, 0.95);
 }
 
-html[data-theme='vintage'] .logo {
+html[data-theme='vintage'] .logo,
+html[data-theme='vintage'] .logo--with-tagline .logo__word {
   font-family: 'UnifrakturMaguntia', 'Pirata One', 'Cormorant Garamond', Georgia, serif;
   font-weight: 400;
   letter-spacing: 0.01em;
@@ -6005,7 +6160,8 @@ html[data-theme='anime'] .nav-item--active svg {
 }
 
 /* Logo: dramatic comic-book emboss with yellow → magenta → cyan gradient */
-html[data-theme='anime'] .logo {
+html[data-theme='anime'] .logo,
+html[data-theme='anime'] .logo--with-tagline .logo__word {
   font-family: var(--anime-display-inline);
   font-weight: 400;
   letter-spacing: 0.02em;
@@ -6319,7 +6475,8 @@ html[data-theme='cartoon'] .nav-item--active svg {
 }
 
 /* Big bouncy logo with comic-book emboss */
-html[data-theme='cartoon'] .logo {
+html[data-theme='cartoon'] .logo,
+html[data-theme='cartoon'] .logo--with-tagline .logo__word {
   font-family: var(--cartoon-display);
   font-weight: 400;
   letter-spacing: 0.01em;

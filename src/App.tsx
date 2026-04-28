@@ -5542,23 +5542,60 @@ function TrueStoryMark({ size = 22 }: { size?: number }) {
   )
 }
 
-const BRAND_DISPLAY: Record<Exclude<BrandId, 'newsmuncher'>, { word: string; className: string; Mark: React.ComponentType<{ size?: number }> }> = {
-  bitstale:  { word: 'bitsTale',  className: 'logo--bitstale',  Mark: BitstaleMark },
-  reportale: { word: 'Reportale', className: 'logo--reportale', Mark: ReporTaleMark },
-  snippets:  { word: 'Snippeds',  className: 'logo--snippets',  Mark: SnippetsMark },
-  truestory: { word: 'TrueStory', className: 'logo--truestory', Mark: TrueStoryMark },
+const NEWSMUNCHER_TAGLINE = 'Big stories, small bites.'
+
+const BRAND_DISPLAY: Record<Exclude<BrandId, 'newsmuncher'>, { word: string; tagline: string; className: string; Mark: React.ComponentType<{ size?: number }> }> = {
+  bitstale:  { word: 'bitsTale',  tagline: 'Stories at the speed of bits.',  className: 'logo--bitstale',  Mark: BitstaleMark },
+  reportale: { word: 'Reportale', tagline: 'From the wire to the world.',    className: 'logo--reportale', Mark: ReporTaleMark },
+  snippets:  { word: 'Snippeds',  tagline: 'Cut to the story.',              className: 'logo--snippets',  Mark: SnippetsMark },
+  truestory: { word: 'TrueStory', tagline: 'Reported, not rumored.',         className: 'logo--truestory', Mark: TrueStoryMark },
+}
+
+function brandTagline(brand: BrandId): string {
+  return brand === 'newsmuncher' ? NEWSMUNCHER_TAGLINE : BRAND_DISPLAY[brand].tagline
 }
 
 function BrandLogo({ brand }: { brand: BrandId }) {
   if (brand === 'newsmuncher') {
-    return <h1 className="logo">Newsmuncher</h1>
+    return (
+      <h1 className="logo logo--with-tagline">
+        <span className="logo__word">Newsmuncher</span>
+        <span className="logo__tagline">{NEWSMUNCHER_TAGLINE}</span>
+      </h1>
+    )
   }
   const cfg = BRAND_DISPLAY[brand]
   return (
-    <h1 className={`logo logo--brand ${cfg.className}`} aria-label={cfg.word}>
-      <span className="logo-brand__icon"><cfg.Mark /></span>
-      <span className="logo-brand__word">{cfg.word}</span>
+    <h1 className={`logo logo--brand logo--with-tagline ${cfg.className}`} aria-label={cfg.word}>
+      <span className="logo-brand__row">
+        <span className="logo-brand__icon"><cfg.Mark /></span>
+        <span className="logo-brand__word">{cfg.word}</span>
+      </span>
+      <span className="logo__tagline">{cfg.tagline}</span>
     </h1>
+  )
+}
+
+function AppFooter({ brand }: { brand: BrandId }) {
+  const word = brand === 'newsmuncher' ? 'Newsmuncher' : BRAND_DISPLAY[brand].word
+  const tagline = brandTagline(brand)
+  const Mark = brand === 'newsmuncher' ? null : BRAND_DISPLAY[brand].Mark
+  const year = new Date().getFullYear()
+  return (
+    <footer className={`app-footer${brand !== 'newsmuncher' ? ` app-footer--brand ${BRAND_DISPLAY[brand].className.replace('logo--', 'app-footer--')}` : ''}`}>
+      <div className="app-footer__brand">
+        {Mark && <span className="app-footer__icon"><Mark size={28} /></span>}
+        <span className="app-footer__word">{word}</span>
+      </div>
+      <p className="app-footer__tagline">{tagline}</p>
+      <ul className="app-footer__links" aria-label="Footer links">
+        <li><a href="#" onClick={(e) => e.preventDefault()}>About</a></li>
+        <li><a href="#" onClick={(e) => e.preventDefault()}>Privacy</a></li>
+        <li><a href="#" onClick={(e) => e.preventDefault()}>Terms</a></li>
+        <li><a href="#" onClick={(e) => e.preventDefault()}>Contact</a></li>
+      </ul>
+      <p className="app-footer__copy">© {year} {word}. All rights reserved.</p>
+    </footer>
   )
 }
 
@@ -6126,6 +6163,10 @@ export default function App() {
             </h2>
             <p className="placeholder-screen__text">Saved stories and preferences will appear here.</p>
           </section>
+        )}
+
+        {!detailStory && !showBookmarks && nav !== 'foryou' && (
+          <AppFooter brand={brand} />
         )}
       </main>
 
