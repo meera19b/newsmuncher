@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import './App.css'
@@ -1631,7 +1631,19 @@ function ImpactDomainIcon({ kind }: { kind: ImpactDomainKind }) {
   }
 }
 
-function ImpactSparkline({ series, direction, height = 36 }: { series: number[]; direction: 'up' | 'down' | 'flat'; height?: number }) {
+function ImpactSparkline({
+  series,
+  direction,
+  height = 36,
+  mode = 'price',
+}: {
+  series: number[]
+  direction: 'up' | 'down' | 'flat'
+  height?: number
+  /** 'price' = up is good (green) — stocks/indices.
+   *  'metric' = up is bad (red) — inflation, premiums, costs. */
+  mode?: 'price' | 'metric'
+}) {
   const w = 96
   const h = height
   const min = Math.min(...series)
@@ -1641,8 +1653,20 @@ function ImpactSparkline({ series, direction, height = 36 }: { series: number[];
   const points = series.map((v, i) => `${i * stepX},${h - ((v - min) / range) * (h - 4) - 2}`)
   const path = `M${points.join(' L')}`
   const area = `${path} L${w},${h} L0,${h} Z`
-  const stroke = direction === 'up' ? '#dc2626' : direction === 'down' ? '#0d9488' : '#64748b'
-  const fill = direction === 'up' ? 'rgba(220,38,38,0.12)' : direction === 'down' ? 'rgba(13,148,136,0.12)' : 'rgba(100,116,139,0.10)'
+
+  const stroke =
+    direction === 'flat'
+      ? '#64748b'
+      : mode === 'metric'
+        ? (direction === 'up' ? '#dc2626' : '#0d9488')
+        : (direction === 'up' ? '#16a34a' : '#dc2626')
+  const fill =
+    direction === 'flat'
+      ? 'rgba(100,116,139,0.10)'
+      : mode === 'metric'
+        ? (direction === 'up' ? 'rgba(220,38,38,0.12)' : 'rgba(13,148,136,0.12)')
+        : (direction === 'up' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)')
+
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="impact-spark" preserveAspectRatio="none" aria-hidden>
       <path d={area} fill={fill} stroke="none" />
@@ -1713,7 +1737,7 @@ function ImpactPanel({ story, onClosePanel }: { story: Story; onClosePanel: () =
                   {renderArrow(direction)}
                   <span>{t.delta > 0 ? '+' : ''}{t.delta.toFixed(1)}%</span>
                 </p>
-                <ImpactSparkline series={t.series} direction={direction} />
+                <ImpactSparkline series={t.series} direction={direction} mode="metric" />
               </article>
             )
           })}
@@ -4794,6 +4818,2707 @@ function CityMapScreen() {
   )
 }
 
+/* ── Finance screen ───────────────────────────────── */
+type FinExchange = {
+  code: string
+  name: string
+  region: string
+  short: string
+}
+
+const FIN_EXCHANGES: FinExchange[] = [
+  { code: 'NASDAQ',   name: 'Nasdaq',                  region: 'United States',   short: 'NDQ' },
+  { code: 'NYSE',     name: 'New York Stock Exchange', region: 'United States',   short: 'NYS' },
+  { code: 'LSE',      name: 'London Stock Exchange',   region: 'United Kingdom',  short: 'LSE' },
+  { code: 'TSE',      name: 'Tokyo Stock Exchange',    region: 'Japan',           short: 'TSE' },
+  { code: 'NSE',      name: 'National Stock Exchange', region: 'India',           short: 'NSE' },
+  { code: 'BSE',      name: 'Bombay Stock Exchange',   region: 'India',           short: 'BSE' },
+  { code: 'HKEX',     name: 'Hong Kong Exchange',      region: 'Hong Kong',       short: 'HKX' },
+  { code: 'EURONEXT', name: 'Euronext',                region: 'European Union',  short: 'EUR' },
+  { code: 'TSX',      name: 'Toronto Stock Exchange',  region: 'Canada',          short: 'TSX' },
+  { code: 'SSE',      name: 'Shanghai Stock Exchange', region: 'China',           short: 'SSE' },
+]
+
+type IndexConstituent = {
+  ticker: string
+  name: string
+  sector: string
+  changePct: number
+  series: number[]
+}
+
+type IndexInfo = {
+  symbol: string
+  fullName: string
+  region: string
+  description: string
+  pct: number
+  up: boolean
+  level: string
+  series: number[]
+  constituents: IndexConstituent[]
+}
+
+const FINANCE_INDICES: IndexInfo[] = [
+  {
+    symbol: 'SPX',
+    fullName: 'S&P 500',
+    region: 'United States',
+    description: '500 large-cap US stocks across all sectors.',
+    pct: 0.42,
+    up: true,
+    level: '5,231.18',
+    series: [5180, 5195, 5188, 5202, 5215, 5210, 5225, 5231],
+    constituents: [
+      { ticker: 'AAPL',  name: 'Apple',              sector: 'Technology',  changePct: 1.4,  series: [100, 100, 101, 101, 101, 102, 101, 101.4] },
+      { ticker: 'MSFT',  name: 'Microsoft',          sector: 'Technology',  changePct: 0.8,  series: [100, 100, 100, 100, 100, 101, 100, 100.8] },
+      { ticker: 'NVDA',  name: 'Nvidia',             sector: 'Semiconductors', changePct: 2.1, series: [100, 100, 101, 101, 102, 102, 102, 102.1] },
+      { ticker: 'AMZN',  name: 'Amazon',             sector: 'Consumer',    changePct: 0.6,  series: [100, 100, 100, 100, 100, 101, 100, 100.6] },
+      { ticker: 'JPM',   name: 'JPMorgan Chase',     sector: 'Financials',  changePct: 0.9,  series: [100, 100, 100, 100, 101, 101, 101, 100.9] },
+      { ticker: 'XOM',   name: 'Exxon Mobil',        sector: 'Energy',      changePct: -0.7, series: [100, 100, 100, 100,  99,  99,  99,  99.3] },
+      { ticker: 'JNJ',   name: 'Johnson & Johnson',  sector: 'Healthcare',  changePct: 0.3,  series: [100, 100, 100, 100, 100, 100, 100, 100.3] },
+      { ticker: 'V',     name: 'Visa',               sector: 'Financials',  changePct: 1.0,  series: [100, 100, 100, 100, 101, 101, 101, 101.0] },
+    ],
+  },
+  {
+    symbol: 'NDX',
+    fullName: 'Nasdaq 100',
+    region: 'United States',
+    description: '100 largest non-financial Nasdaq companies, tech-heavy.',
+    pct: -0.18,
+    up: false,
+    level: '18,420.62',
+    series: [18460, 18488, 18475, 18450, 18435, 18445, 18430, 18420],
+    constituents: [
+      { ticker: 'AAPL',  name: 'Apple',              sector: 'Technology',  changePct:  1.4, series: [100, 100, 101, 101, 101, 102, 101, 101.4] },
+      { ticker: 'MSFT',  name: 'Microsoft',          sector: 'Technology',  changePct: -0.4, series: [100, 100, 100, 100, 100,  99, 100,  99.6] },
+      { ticker: 'GOOGL', name: 'Alphabet',           sector: 'Internet',    changePct: -0.6, series: [100, 100, 100,  99,  99,  99,  99,  99.4] },
+      { ticker: 'META',  name: 'Meta Platforms',     sector: 'Internet',    changePct: -0.9, series: [100, 100,  99,  99,  99,  98,  99,  99.1] },
+      { ticker: 'NVDA',  name: 'Nvidia',             sector: 'Semiconductors', changePct: -0.8, series: [100, 100, 100, 100,  99,  99,  99,  99.2] },
+      { ticker: 'TSLA',  name: 'Tesla',              sector: 'Auto',        changePct:  1.4, series: [100, 100, 101, 101, 101, 102, 101, 101.4] },
+      { ticker: 'AVGO',  name: 'Broadcom',           sector: 'Semiconductors', changePct: -1.1, series: [100, 100, 100,  99,  99,  99,  98,  98.9] },
+      { ticker: 'COST',  name: 'Costco',             sector: 'Retail',      changePct:  0.4, series: [100, 100, 100, 100, 100, 101, 100, 100.4] },
+    ],
+  },
+  {
+    symbol: 'DJI',
+    fullName: 'Dow Jones Industrial',
+    region: 'United States',
+    description: '30 large, well-known US blue-chip companies.',
+    pct: 0.31,
+    up: true,
+    level: '39,512.84',
+    series: [39380, 39410, 39395, 39440, 39470, 39450, 39495, 39512],
+    constituents: [
+      { ticker: 'AAPL',  name: 'Apple',              sector: 'Technology',  changePct:  0.9, series: [100, 100, 100, 100, 101, 101, 101, 100.9] },
+      { ticker: 'JPM',   name: 'JPMorgan Chase',     sector: 'Financials',  changePct:  0.9, series: [100, 100, 100, 100, 101, 101, 101, 100.9] },
+      { ticker: 'CAT',   name: 'Caterpillar',        sector: 'Industrials', changePct:  0.6, series: [100, 100, 100, 100, 100, 101, 100, 100.6] },
+      { ticker: 'BA',    name: 'Boeing',             sector: 'Industrials', changePct: -0.5, series: [100, 100, 100, 100, 100,  99,  99,  99.5] },
+      { ticker: 'KO',    name: 'Coca-Cola',          sector: 'Consumer',    changePct:  0.2, series: [100, 100, 100, 100, 100, 100, 100, 100.2] },
+      { ticker: 'WMT',   name: 'Walmart',            sector: 'Retail',      changePct:  0.7, series: [100, 100, 100, 100, 101, 101, 100, 100.7] },
+      { ticker: 'V',     name: 'Visa',               sector: 'Financials',  changePct:  1.0, series: [100, 100, 100, 100, 101, 101, 101, 101.0] },
+      { ticker: 'CVX',   name: 'Chevron',            sector: 'Energy',      changePct: -0.8, series: [100, 100, 100, 100,  99,  99,  99,  99.2] },
+    ],
+  },
+  {
+    symbol: 'RUT',
+    fullName: 'Russell 2000',
+    region: 'United States',
+    description: '2,000 small-cap US companies — a domestic-economy proxy.',
+    pct: -0.52,
+    up: false,
+    level: '2,058.46',
+    series: [2078, 2082, 2075, 2070, 2068, 2062, 2060, 2058],
+    constituents: [
+      { ticker: 'SMCI',  name: 'Super Micro Computer', sector: 'Hardware',  changePct: -1.8, series: [100, 100,  99,  99,  98,  98,  98,  98.2] },
+      { ticker: 'CVNA',  name: 'Carvana',            sector: 'Retail',      changePct: -2.4, series: [100,  99,  99,  98,  98,  97,  97,  97.6] },
+      { ticker: 'IONQ',  name: 'IonQ',               sector: 'Quantum',     changePct:  1.2, series: [100, 100, 100, 101, 101, 101, 101, 101.2] },
+      { ticker: 'PLTR',  name: 'Palantir',           sector: 'Software',    changePct:  0.8, series: [100, 100, 100, 100, 100, 101, 100, 100.8] },
+      { ticker: 'CELH',  name: 'Celsius Holdings',   sector: 'Beverages',   changePct: -1.3, series: [100, 100, 100,  99,  99,  99,  99,  98.7] },
+      { ticker: 'AXSM',  name: 'Axsome Therapeutics',sector: 'Biotech',     changePct: -0.6, series: [100, 100, 100, 100, 100,  99, 100,  99.4] },
+      { ticker: 'INSM',  name: 'Insmed',             sector: 'Biotech',     changePct:  0.4, series: [100, 100, 100, 100, 100, 101, 100, 100.4] },
+    ],
+  },
+  {
+    symbol: 'FTSE',
+    fullName: 'FTSE 100',
+    region: 'United Kingdom',
+    description: '100 largest London-listed companies by market cap.',
+    pct: 0.18,
+    up: true,
+    level: '8,196.34',
+    series: [8170, 8175, 8180, 8185, 8190, 8188, 8194, 8196],
+    constituents: [
+      { ticker: 'AZN.L', name: 'AstraZeneca',        sector: 'Pharma',      changePct:  0.5, series: [100, 100, 100, 100, 100, 101, 100, 100.5] },
+      { ticker: 'SHEL.L',name: 'Shell',              sector: 'Energy',      changePct: -0.4, series: [100, 100, 100, 100, 100,  99, 100,  99.6] },
+      { ticker: 'HSBA.L',name: 'HSBC',               sector: 'Financials',  changePct:  0.7, series: [100, 100, 100, 100, 101, 101, 100, 100.7] },
+      { ticker: 'ULVR.L',name: 'Unilever',           sector: 'Consumer',    changePct:  0.2, series: [100, 100, 100, 100, 100, 100, 100, 100.2] },
+      { ticker: 'BP.L',  name: 'BP',                 sector: 'Energy',      changePct: -0.6, series: [100, 100, 100, 100, 100,  99,  99,  99.4] },
+      { ticker: 'GSK.L', name: 'GSK',                sector: 'Pharma',      changePct:  0.3, series: [100, 100, 100, 100, 100, 100, 100, 100.3] },
+      { ticker: 'BARC.L',name: 'Barclays',           sector: 'Financials',  changePct:  0.9, series: [100, 100, 100, 100, 101, 101, 101, 100.9] },
+    ],
+  },
+  {
+    symbol: 'NIKKEI',
+    fullName: 'Nikkei 225',
+    region: 'Japan',
+    description: '225 prominent Japanese companies on the Tokyo exchange.',
+    pct: 0.74,
+    up: true,
+    level: '40,918.20',
+    series: [40620, 40680, 40720, 40760, 40790, 40830, 40880, 40918],
+    constituents: [
+      { ticker: '7203.T',name: 'Toyota Motor',       sector: 'Auto',        changePct:  1.1, series: [100, 100, 100, 101, 101, 101, 101, 101.1] },
+      { ticker: '6758.T',name: 'Sony Group',         sector: 'Electronics', changePct:  0.6, series: [100, 100, 100, 100, 100, 101, 100, 100.6] },
+      { ticker: '9984.T',name: 'SoftBank Group',     sector: 'Conglomerate',changePct:  1.8, series: [100, 100, 101, 101, 101, 102, 101, 101.8] },
+      { ticker: '6861.T',name: 'Keyence',            sector: 'Industrials', changePct:  0.4, series: [100, 100, 100, 100, 100, 101, 100, 100.4] },
+      { ticker: '8035.T',name: 'Tokyo Electron',     sector: 'Semiconductors', changePct: 1.5, series: [100, 100, 101, 101, 101, 102, 101, 101.5] },
+      { ticker: '9983.T',name: 'Fast Retailing',     sector: 'Retail',      changePct: -0.2, series: [100, 100, 100, 100, 100, 100, 100,  99.8] },
+      { ticker: '6098.T',name: 'Recruit Holdings',   sector: 'Services',    changePct:  0.7, series: [100, 100, 100, 100, 101, 101, 100, 100.7] },
+    ],
+  },
+]
+
+type SearchInstrument = {
+  symbol: string
+  name: string
+  type: 'Equity' | 'Index' | 'ETF' | 'Crypto' | 'Commodity' | 'Forex'
+  exchange?: string
+}
+
+const SEARCH_INSTRUMENTS: SearchInstrument[] = [
+  { symbol: 'AAPL',  name: 'Apple Inc.',           type: 'Equity', exchange: 'NASDAQ' },
+  { symbol: 'MSFT',  name: 'Microsoft',            type: 'Equity', exchange: 'NASDAQ' },
+  { symbol: 'NVDA',  name: 'Nvidia',               type: 'Equity', exchange: 'NASDAQ' },
+  { symbol: 'AMZN',  name: 'Amazon',               type: 'Equity', exchange: 'NASDAQ' },
+  { symbol: 'GOOGL', name: 'Alphabet',             type: 'Equity', exchange: 'NASDAQ' },
+  { symbol: 'META',  name: 'Meta Platforms',       type: 'Equity', exchange: 'NASDAQ' },
+  { symbol: 'TSLA',  name: 'Tesla',                type: 'Equity', exchange: 'NASDAQ' },
+  { symbol: 'JPM',   name: 'JPMorgan Chase',       type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'V',     name: 'Visa',                 type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'XOM',   name: 'Exxon Mobil',          type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'JNJ',   name: 'Johnson & Johnson',    type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'WMT',   name: 'Walmart',              type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'BA',    name: 'Boeing',               type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'CAT',   name: 'Caterpillar',          type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'KO',    name: 'Coca-Cola',            type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'CVX',   name: 'Chevron',              type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'COIN',  name: 'Coinbase',             type: 'Equity', exchange: 'NASDAQ' },
+  { symbol: 'PLTR',  name: 'Palantir',             type: 'Equity', exchange: 'NYSE' },
+  { symbol: 'SPX',   name: 'S&P 500',              type: 'Index'  },
+  { symbol: 'NDX',   name: 'Nasdaq 100',           type: 'Index'  },
+  { symbol: 'DJI',   name: 'Dow Jones Industrial', type: 'Index'  },
+  { symbol: 'RUT',   name: 'Russell 2000',         type: 'Index'  },
+  { symbol: 'SPY',   name: 'SPDR S&P 500 ETF',     type: 'ETF'    },
+  { symbol: 'QQQ',   name: 'Invesco QQQ ETF',      type: 'ETF'    },
+  { symbol: 'BTC',   name: 'Bitcoin',              type: 'Crypto' },
+  { symbol: 'ETH',   name: 'Ethereum',             type: 'Crypto' },
+  { symbol: 'GOLD',  name: 'Gold spot',            type: 'Commodity' },
+  { symbol: 'OIL',   name: 'WTI Crude Oil',        type: 'Commodity' },
+  { symbol: 'EUR/USD', name: 'Euro / US Dollar',   type: 'Forex'  },
+]
+
+type EconKey = 'inflation' | 'jobs' | 'growth'
+type EconRange = {
+  min: number
+  max: number
+  targetLow: number
+  targetHigh: number
+  targetLabel: string
+}
+type EconIndicator = {
+  id: EconKey
+  label: string
+  current: string
+  currentValue: number
+  trailing: string
+  delta: number
+  goodWhenUp: boolean
+  range: EconRange
+  story: string
+  newsHeadline: string
+  newsSource: string
+  symbols: string[]
+}
+
+const ECONOMIC_INDICATORS: EconIndicator[] = [
+  {
+    id: 'inflation', label: 'CPI inflation', current: '3.2%', currentValue: 3.2, trailing: 'YoY · last month',
+    delta: -0.4, goodWhenUp: false,
+    range: { min: 0, max: 6, targetLow: 1.5, targetHigh: 2.5, targetLabel: 'Fed target 2%' },
+    story: 'Headline disinflation continues; services prices remain sticky.',
+    newsHeadline: 'Goods cool but services keep CPI above target',
+    newsSource: 'Reuters', symbols: ['SPX', 'GOLD'],
+  },
+  {
+    id: 'jobs', label: 'Unemployment', current: '4.1%', currentValue: 4.1, trailing: 'Headline · last month',
+    delta: -0.2, goodWhenUp: false,
+    range: { min: 2, max: 8, targetLow: 3.5, targetHigh: 5, targetLabel: 'Full-employment band' },
+    story: 'Hiring softens but layoffs remain low; wage growth easing.',
+    newsHeadline: 'Payrolls in line; wages cool slightly',
+    newsSource: 'Bloomberg', symbols: ['JPM', 'WMT'],
+  },
+  {
+    id: 'growth', label: 'GDP growth', current: '2.4%', currentValue: 2.4, trailing: 'Annualized · last quarter',
+    delta: 0.3, goodWhenUp: true,
+    range: { min: -2, max: 5, targetLow: 2, targetHigh: 3, targetLabel: 'Trend growth ~2.5%' },
+    story: 'Consumer spending and capex still support modest expansion.',
+    newsHeadline: 'GDP revised higher on capex strength',
+    newsSource: 'WSJ', symbols: ['NDX', 'CAT', 'NVDA'],
+  },
+]
+
+type SectorRow = {
+  id: string
+  name: string
+  changePct: number
+  weight: string
+  cols: 1 | 2
+  rows: 1 | 2
+  topCompanies: { ticker: string; changePct: number }[]
+  newsHeadline: string
+  newsSource: string
+}
+
+const FIN_SECTORS: SectorRow[] = [
+  { id: 'tech',       name: 'Technology',  changePct:  1.8, weight: '29%', cols: 2, rows: 2, topCompanies: [{ ticker: 'NVDA', changePct: 2.1 }, { ticker: 'AAPL', changePct: 1.4 }, { ticker: 'MSFT', changePct: 0.8 }], newsHeadline: 'AI capex still lifts the chip leaders', newsSource: 'Bloomberg' },
+  { id: 'health',     name: 'Healthcare',  changePct:  0.6, weight: '12%', cols: 2, rows: 1, topCompanies: [{ ticker: 'JNJ',  changePct: 0.3 }, { ticker: 'AZN.L', changePct: 0.5 }, { ticker: 'GSK.L', changePct: 0.3 }], newsHeadline: 'Pharma defensives bid as macro softens', newsSource: 'Reuters' },
+  { id: 'fin',        name: 'Financials',  changePct:  0.9, weight: '13%', cols: 2, rows: 1, topCompanies: [{ ticker: 'JPM',  changePct: 0.9 }, { ticker: 'V',    changePct: 1.0 }, { ticker: 'BARC.L', changePct: 0.9 }], newsHeadline: 'Bank shares climb on yield curve repricing', newsSource: 'FT' },
+  { id: 'consumer',   name: 'Consumer',    changePct: -0.3, weight: '14%', cols: 1, rows: 2, topCompanies: [{ ticker: 'AMZN', changePct: 0.6 }, { ticker: 'KO',   changePct: 0.2 }, { ticker: 'WMT',   changePct: 0.7 }], newsHeadline: 'Discretionary mixed as weather hits foot traffic', newsSource: 'Bloomberg' },
+  { id: 'industrial', name: 'Industrials', changePct:  0.4, weight: '9%',  cols: 1, rows: 2, topCompanies: [{ ticker: 'CAT',  changePct: 0.6 }, { ticker: 'BA',   changePct: -0.5 }, { ticker: 'KEY',   changePct: 0.4 }], newsHeadline: 'Backlogs steady; Boeing weighs on group', newsSource: 'WSJ' },
+  { id: 'energy',     name: 'Energy',      changePct: -1.4, weight: '4%',  cols: 1, rows: 1, topCompanies: [{ ticker: 'XOM',  changePct: -0.7 }, { ticker: 'CVX', changePct: -0.8 }, { ticker: 'BP.L', changePct: -0.6 }], newsHeadline: 'Crude slides on demand revisions', newsSource: 'Reuters' },
+  { id: 'realestate', name: 'Real estate', changePct: -0.6, weight: '3%',  cols: 1, rows: 1, topCompanies: [{ ticker: 'AMT',  changePct: -0.4 }, { ticker: 'PLD', changePct: -0.7 }, { ticker: 'EQIX', changePct: -0.3 }], newsHeadline: 'Higher-for-longer pressures REITs', newsSource: 'FT' },
+  { id: 'utilities',  name: 'Utilities',   changePct:  0.2, weight: '3%',  cols: 1, rows: 1, topCompanies: [{ ticker: 'NEE',  changePct: 0.3 }, { ticker: 'DUK',  changePct: 0.1 }, { ticker: 'SO',   changePct: 0.2 }], newsHeadline: 'Regulated utilities steady on rate signals', newsSource: 'WSJ' },
+  { id: 'materials',  name: 'Materials',   changePct: -0.8, weight: '3%',  cols: 1, rows: 1, topCompanies: [{ ticker: 'LIN',  changePct: -0.5 }, { ticker: 'FCX', changePct: -1.2 }, { ticker: 'NUE', changePct: -0.6 }], newsHeadline: 'Copper retreats on China demand reads', newsSource: 'Bloomberg' },
+]
+
+type CapTier = 'large' | 'mid' | 'small'
+type CapStock = {
+  ticker: string
+  name: string
+  marketCap: string
+  changePct: number
+  series: number[]
+  initials: string
+  bg: string
+}
+
+const CAP_STOCKS: Record<CapTier, CapStock[]> = {
+  large: [
+    { ticker: 'AAPL',  name: 'Apple',     marketCap: '$3.4T', changePct:  1.4, series: [100,100,101,101,101,102,101,101.4], initials: 'AA', bg: 'linear-gradient(135deg,#0f172a,#475569)' },
+    { ticker: 'MSFT',  name: 'Microsoft', marketCap: '$3.1T', changePct:  0.8, series: [100,100,100,100,100,101,100,100.8], initials: 'MS', bg: 'linear-gradient(135deg,#0d9488,#0e7490)' },
+    { ticker: 'NVDA',  name: 'Nvidia',    marketCap: '$2.7T', changePct:  2.1, series: [100,100,101,101,102,102,102,102.1], initials: 'NV', bg: 'linear-gradient(135deg,#16a34a,#0d9488)' },
+    { ticker: 'AMZN',  name: 'Amazon',    marketCap: '$1.8T', changePct:  0.6, series: [100,100,100,100,100,101,100,100.6], initials: 'AM', bg: 'linear-gradient(135deg,#f97316,#dc2626)' },
+    { ticker: 'GOOGL', name: 'Alphabet',  marketCap: '$1.9T', changePct: -0.6, series: [100,100,100,99,99,99,99,99.4],     initials: 'GO', bg: 'linear-gradient(135deg,#0369a1,#2563eb)' },
+    { ticker: 'META',  name: 'Meta',      marketCap: '$1.2T', changePct: -0.9, series: [100,100,99,99,99,98,99,99.1],      initials: 'ME', bg: 'linear-gradient(135deg,#3b82f6,#6366f1)' },
+  ],
+  mid: [
+    { ticker: 'SHOP',  name: 'Shopify',   marketCap: '$92B',  changePct:  1.2, series: [100,100,100,101,101,101,101,101.2], initials: 'SH', bg: 'linear-gradient(135deg,#16a34a,#22c55e)' },
+    { ticker: 'SNOW',  name: 'Snowflake', marketCap: '$54B',  changePct: -1.3, series: [100,100,100,99,99,99,99,98.7],      initials: 'SN', bg: 'linear-gradient(135deg,#0ea5e9,#38bdf8)' },
+    { ticker: 'DASH',  name: 'DoorDash',  marketCap: '$56B',  changePct:  0.8, series: [100,100,100,100,100,101,100,100.8], initials: 'DA', bg: 'linear-gradient(135deg,#dc2626,#ef4444)' },
+    { ticker: 'COIN',  name: 'Coinbase',  marketCap: '$48B',  changePct:  2.4, series: [100,101,101,102,102,102,102,102.4], initials: 'CO', bg: 'linear-gradient(135deg,#2563eb,#1d4ed8)' },
+    { ticker: 'PLTR',  name: 'Palantir',  marketCap: '$58B',  changePct:  0.8, series: [100,100,100,100,100,101,100,100.8], initials: 'PL', bg: 'linear-gradient(135deg,#0f172a,#334155)' },
+    { ticker: 'NET',   name: 'Cloudflare',marketCap: '$30B',  changePct: -0.7, series: [100,100,100,100,99,99,99,99.3],     initials: 'NE', bg: 'linear-gradient(135deg,#f97316,#ea580c)' },
+  ],
+  small: [
+    { ticker: 'IONQ',  name: 'IonQ',         marketCap: '$2.4B', changePct:  1.2, series: [100,100,100,101,101,101,101,101.2], initials: 'IO', bg: 'linear-gradient(135deg,#a855f7,#7e22ce)' },
+    { ticker: 'CELH',  name: 'Celsius',      marketCap: '$5.8B', changePct: -1.3, series: [100,100,100,99,99,99,99,98.7],      initials: 'CE', bg: 'linear-gradient(135deg,#22c55e,#16a34a)' },
+    { ticker: 'AXSM',  name: 'Axsome',       marketCap: '$3.1B', changePct: -0.6, series: [100,100,100,100,100,99,100,99.4],   initials: 'AX', bg: 'linear-gradient(135deg,#0d9488,#0e7490)' },
+    { ticker: 'INSM',  name: 'Insmed',       marketCap: '$3.6B', changePct:  0.4, series: [100,100,100,100,100,101,100,100.4], initials: 'IN', bg: 'linear-gradient(135deg,#dc2626,#b91c1c)' },
+    { ticker: 'CVNA',  name: 'Carvana',      marketCap: '$5.4B', changePct: -2.4, series: [100,99,99,98,98,97,97,97.6],        initials: 'CV', bg: 'linear-gradient(135deg,#0ea5e9,#0284c7)' },
+    { ticker: 'SMCI',  name: 'Super Micro',  marketCap: '$28B',  changePct: -1.8, series: [100,100,99,99,98,98,98,98.2],       initials: 'SM', bg: 'linear-gradient(135deg,#16a34a,#15803d)' },
+  ],
+}
+
+type NewsConn = {
+  id: string
+  tag: TagId
+  headline: string
+  symbols: string[]
+  changePct: number
+  series: number[]
+  highlight: string
+  what: string
+  why: string
+  how: string
+  next: string
+  source: string
+}
+
+const NEWS_CONNECTIONS: NewsConn[] = [
+  {
+    id: 'nc1', tag: 'Tech',
+    headline: 'AI chip orders push NVDA to all-time high',
+    symbols: ['NVDA', 'AVGO', 'MSFT'], changePct: 2.1,
+    series: [100, 100, 101, 101, 102, 102, 102, 102.1],
+    highlight: 'Hyperscaler capex revisions lift the leader and its supply chain.',
+    what: 'NVDA closed at a record after raised AI capex guidance from two hyperscalers.',
+    why: 'Demand for accelerator GPUs continues to outstrip supply, lifting margin guidance.',
+    how: 'Sell-side teams updated FY guides; supply-chain peers (AVGO) followed.',
+    next: 'Watch the next earnings call for FY revenue guide and customer concentration.',
+    source: 'Bloomberg',
+  },
+  {
+    id: 'nc2', tag: 'Politics',
+    headline: 'Cross-border data bill clips ad-tech CPMs',
+    symbols: ['META', 'GOOGL', 'TTD'], changePct: -0.9,
+    series: [100, 100, 99, 99, 99, 98, 99, 99.1],
+    highlight: 'Compliance overhead trims growth assumptions across the auction stack.',
+    what: 'Ad-tech names dropped after committee vote on cross-border data flows.',
+    why: 'Liability carve-outs were left ambiguous, raising compliance costs.',
+    how: 'Sell-side trimmed ad-revenue forecasts; smaller networks hit hardest.',
+    next: 'Second reading in autumn; watch language on liability and exemptions.',
+    source: 'Financial Times',
+  },
+  {
+    id: 'nc3', tag: 'World',
+    headline: 'Arctic shipping pilots squeeze tanker spreads',
+    symbols: ['XOM', 'CVX', 'SHEL.L'], changePct: -0.7,
+    series: [100, 100, 100, 100, 99, 99, 99, 99.3],
+    highlight: 'Shorter routes reduce floating storage and bunker demand.',
+    what: 'Oil majors slipped after carriers reported measurable bunker savings.',
+    why: 'Northern Sea Route trials shorten Asia–Europe legs versus Suez.',
+    how: 'Refiners adjust crack spreads; freight derivatives reprice.',
+    next: 'IMO corridor standards in autumn could expand or constrain traffic.',
+    source: 'Reuters',
+  },
+  {
+    id: 'nc4', tag: 'Tech',
+    headline: 'Open-weight models lift on-device coding tools',
+    symbols: ['MSFT', 'NVDA', 'GTLB'], changePct: -0.4,
+    series: [100, 100, 100, 100, 100, 99, 100, 99.6],
+    highlight: 'Local stacks pressure cloud GPU spend forecasts.',
+    what: 'Cloud providers slipped as enterprises pilot laptop inference.',
+    why: 'Quantized open models match commercial APIs on common code tasks.',
+    how: 'Spend shifts from external APIs to one-time hardware refreshes.',
+    next: 'Q3 maintainer release expected to improve tool-use reliability.',
+    source: 'WSJ',
+  },
+]
+
+type ReturnInst = {
+  id: string
+  name: string
+  category: string
+  pct: number
+  risk: 1 | 2 | 3 | 4 | 5
+  color: string
+  trendNote: string
+  newsSource: string
+}
+
+const RETURN_INSTRUMENTS: ReturnInst[] = [
+  { id: 'fd',         name: 'Fixed deposit',    category: 'Cash & equivalents', pct: 5.5,  risk: 1, color: '#0d9488', trendNote: 'Banks holding rates higher for longer; renewals attractive.', newsSource: 'Reuters' },
+  { id: 'bonds',      name: 'Government bonds', category: 'Fixed income',       pct: 4.6,  risk: 2, color: '#0369a1', trendNote: 'Term premium drifting; long bonds re-pricing.',                newsSource: 'Bloomberg' },
+  { id: 'mf',         name: 'Mutual funds',     category: 'Diversified',        pct: 9.2,  risk: 3, color: '#9333ea', trendNote: 'Balanced funds benefit from broadening rally.',                newsSource: 'FT' },
+  { id: 'equity',     name: 'Equity (S&P 500)', category: 'Stocks',             pct: 11.4, risk: 4, color: '#dc2626', trendNote: 'Earnings revisions positive; valuations stretched.',           newsSource: 'WSJ' },
+  { id: 'gold',       name: 'Gold',             category: 'Commodity',          pct: 6.8,  risk: 2, color: '#f59e0b', trendNote: 'Central-bank buying steady; rate cuts a tailwind.',            newsSource: 'Reuters' },
+  { id: 'realestate', name: 'Real estate',      category: 'Property',           pct: 7.4,  risk: 3, color: '#0891b2', trendNote: 'REIT yields recovering as the rate path clarifies.',          newsSource: 'Bloomberg' },
+  { id: 'crypto',     name: 'Crypto (BTC)',     category: 'Digital assets',     pct: 18.5, risk: 5, color: '#f97316', trendNote: 'Spot-ETF flows continue; volatility elevated.',                newsSource: 'CoinDesk' },
+]
+
+type WatchStock = {
+  ticker: string
+  name: string
+  changePct: number
+  series: number[]
+  initials: string
+  bg: string
+  articles: StockArticle[]
+}
+
+const STOCKS_TO_WATCH: WatchStock[] = [
+  {
+    ticker: 'NVDA', name: 'Nvidia', changePct: 2.1,
+    series: [100,100,101,101,102,102,102,102.1],
+    initials: 'NV', bg: 'linear-gradient(135deg,#16a34a,#0d9488)',
+    articles: [
+      {
+        id: 'nvda-1', headline: 'Capex revisions lift FY estimates again', source: 'Bloomberg', publishedAgo: '2h ago',
+        summary: 'Hyperscaler capex guides reset higher; sell-side follows within hours.',
+        image: 'https://picsum.photos/seed/nm-nv1/120/120',
+        body: 'Two large hyperscalers raised AI capex guidance for the coming year, citing GPU allocation visibility through FY27. Sell-side analysts trimmed their estimates higher within hours, with at least four desks bumping FY revenue.\nThe move rippled into the supply chain. Broadcom, which produces custom AI silicon for several of the same customers, traded up alongside the leader.',
+        tree: {
+          root: 'AI capex revisions',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['NVDA', 'AVGO', 'MSFT'] }),
+            tBranch('b2', 'GPU demand', { metrics: [tMetric('Allocation', 2.1)] }),
+            tBranch('b3', 'FY guides', { metrics: [tMetric('Revenue', 1.5), tMetric('Margin', 0.6)] }),
+            tBranch('b4', 'Hyperscalers', { metrics: [tMetric('Capex', 1.2)] }),
+          ],
+          hub: 'What it means',
+          summaries: ['Cycle keeps broadening', 'Concentration in focus', 'Supply chain co-rallies'],
+        },
+      },
+      {
+        id: 'nvda-2', headline: 'Customer concentration disclosure on the radar', source: 'Reuters', publishedAgo: '5h ago',
+        summary: 'Filing language signals investor scrutiny of single-customer revenue share.',
+        image: 'https://picsum.photos/seed/nm-nv2/120/120',
+        body: 'Recent filings called out customer concentration more explicitly than in prior periods. The buyside has started modeling sensitivity to a 10% top-customer haircut.\nA disclosed concentration ratio could come up on the next earnings call. Analysts say the question on the buyside is no longer whether the disclosure tightens, but how the company frames mitigation.',
+        tree: {
+          root: 'Customer concentration',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['NVDA', 'MSFT'] }),
+            tBranch('b2', 'Disclosure', { metrics: [tMetric('Top customer', -0.4)] }),
+            tBranch('b3', 'Sensitivity', { metrics: [tMetric('-10% haircut', -1.0)] }),
+            tBranch('b4', 'Earnings call', { metrics: [tMetric('Q&A focus', 0)] }),
+          ],
+          hub: 'Investor focus',
+          summaries: ['Disclosure pressure rises', 'Sensitivity modelling expands', 'Risk premium adjusts'],
+        },
+      },
+    ],
+  },
+  {
+    ticker: 'TSLA', name: 'Tesla', changePct: 1.4,
+    series: [100,100,101,101,101,102,101,101.4],
+    initials: 'TS', bg: 'linear-gradient(135deg,#dc2626,#7f1d1d)',
+    articles: [
+      {
+        id: 'tsla-1', headline: 'Mass-market trim leaks ahead of investor day', source: 'Reuters', publishedAgo: '3h ago',
+        summary: 'Supplier filings hint at a sub-$30k variant entering the lineup this year.',
+        image: 'https://picsum.photos/seed/nm-ts1/120/120',
+        body: 'Two component suppliers disclosed parts orders consistent with a smaller, lower-priced variant of an existing platform. Investors expect the trim to be confirmed at the upcoming investor day.\nMargin watchers are mixed. The trim could lift volume meaningfully but pressures gross margin in the near term.',
+        tree: {
+          root: 'Mass-market trim',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['TSLA'] }),
+            tBranch('b2', 'Supplier signal', { metrics: [tMetric('Order intake', 1.2)] }),
+            tBranch('b3', 'Volume vs margin', { metrics: [tMetric('Volume', 1.4), tMetric('Margin', -0.6)] }),
+            tBranch('b4', 'Investor day', { metrics: [tMetric('Catalyst', 0.5)] }),
+          ],
+          hub: 'Trade-off ahead',
+          summaries: ['Volume tailwind builds', 'Near-term margin pressure', 'Catalyst at IR day'],
+        },
+      },
+      {
+        id: 'tsla-2', headline: 'Energy storage segment outpaces auto growth', source: 'WSJ', publishedAgo: '8h ago',
+        summary: 'Megapack backlog now stretches into FY27; pricing power improving.',
+        image: 'https://picsum.photos/seed/nm-ts2/120/120',
+        body: 'The energy storage business booked another quarter of triple-digit revenue growth. Megapack backlog stretches into FY27 with pricing improving as supply tightens.\nAnalysts are starting to value the segment separately, which could lift the sum-of-parts case for the equity.',
+        tree: {
+          root: 'Energy storage growth',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['TSLA'] }),
+            tBranch('b2', 'Megapack', { metrics: [tMetric('Backlog', 1.8), tMetric('Pricing', 0.6)] }),
+            tBranch('b3', 'Sum-of-parts', { metrics: [tMetric('Re-rating', 1.0)] }),
+          ],
+          hub: 'Valuation lift',
+          summaries: ['Backlog stretches to FY27', 'Pricing power improving', 'Sum-of-parts case strengthens'],
+        },
+      },
+    ],
+  },
+  {
+    ticker: 'COIN', name: 'Coinbase', changePct: 2.4,
+    series: [100,101,101,102,102,102,102,102.4],
+    initials: 'CO', bg: 'linear-gradient(135deg,#2563eb,#1d4ed8)',
+    articles: [
+      {
+        id: 'coin-1', headline: 'Spot-ETF inflows hit a fresh weekly record', source: 'CoinDesk', publishedAgo: '1h ago',
+        summary: 'BTC spot ETFs absorbed $2.1B last week; custody wins flow through to revenue.',
+        body: 'Spot Bitcoin ETFs absorbed $2.1B in net inflows last week, the highest weekly print in three months. Coinbase is the custodian for most issuers and earns fees on assets in custody.\nA sustained inflow trend would support both fee revenue and on-chain transaction volumes through the next quarter.',
+        tree: {
+          root: 'Spot-ETF inflows',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['COIN'] }),
+            tBranch('b2', 'BTC ETFs', { metrics: [tMetric('Weekly inflow', 2.1)] }),
+            tBranch('b3', 'Custody fees', { metrics: [tMetric('Revenue lift', 1.3)] }),
+            tBranch('b4', 'On-chain volume', { metrics: [tMetric('Q3 trend', 0.9)] }),
+          ],
+          hub: 'Revenue tailwind',
+          summaries: ['Custody book expands', 'Fee revenue follows', 'Sustained inflows expected'],
+        },
+      },
+      {
+        id: 'coin-2', headline: 'International expansion clears two new licences', source: 'Bloomberg', publishedAgo: '6h ago',
+        summary: 'Approvals in two large EU markets open the door to perpetual futures launches.',
+        body: 'Coinbase received licences to operate in two additional EU markets this week. The approvals open the door to launching perpetual futures products for non-US customers.\nDerivatives are higher-margin than spot trading and could lift blended take rates if international adoption tracks management guidance.',
+        tree: {
+          root: 'EU licences',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['COIN'] }),
+            tBranch('b2', 'Perpetual futures', { metrics: [tMetric('Take rate', 1.5)] }),
+            tBranch('b3', 'EU markets', { metrics: [tMetric('Approval', 1.0)] }),
+            tBranch('b4', 'Margin mix', { metrics: [tMetric('Blended', 0.8)] }),
+          ],
+          hub: 'Margin uplift',
+          summaries: ['Two new EU markets', 'Higher-margin derivatives', 'International growth de-risked'],
+        },
+      },
+    ],
+  },
+  {
+    ticker: 'PLTR', name: 'Palantir', changePct: 0.8,
+    series: [100,100,100,100,100,101,100,100.8],
+    initials: 'PL', bg: 'linear-gradient(135deg,#0f172a,#334155)',
+    articles: [
+      {
+        id: 'pltr-1', headline: 'Federal contract pipeline expands further', source: 'WSJ', publishedAgo: '4h ago',
+        summary: 'Two new agency wins lift the visible federal backlog into next fiscal year.',
+        body: 'Palantir disclosed two additional federal contract awards this week, both with multi-year option years. The wins lift visible federal backlog into the next government fiscal year.\nFederal revenue growth had moderated from prior peaks; the new awards begin to address that and push the consensus federal-vs-commercial split.',
+        tree: {
+          root: 'Federal pipeline',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['PLTR'] }),
+            tBranch('b2', 'Backlog', { metrics: [tMetric('FY visibility', 1.3)] }),
+            tBranch('b3', 'New wins', { metrics: [tMetric('Awards', 2.0), tMetric('Option years', 1.0)] }),
+            tBranch('b4', 'Federal mix', { metrics: [tMetric('Re-rating', 0.6)] }),
+          ],
+          hub: 'Pipeline visibility',
+          summaries: ['Backlog stretches forward', 'Multi-year options lock revenue', 'Federal narrative restored'],
+        },
+      },
+      {
+        id: 'pltr-2', headline: 'Commercial AIP traction in earnings preview', source: 'Bloomberg', publishedAgo: '9h ago',
+        summary: 'Buyside notes flag accelerating mid-market adoption of the AIP platform.',
+        body: 'Sell-side previews call out faster mid-market commercial adoption of the AIP platform than prior expectations. Pilot-to-paid conversion rates are reportedly up sharply.\nA strong commercial print on the next earnings call would shift the consensus narrative away from federal dependence.',
+        tree: {
+          root: 'Commercial AIP',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['PLTR'] }),
+            tBranch('b2', 'Mid-market', { metrics: [tMetric('Adoption', 1.8)] }),
+            tBranch('b3', 'Conversion', { metrics: [tMetric('Pilot-to-paid', 1.4)] }),
+            tBranch('b4', 'Mix shift', { metrics: [tMetric('Commercial %', 0.9)] }),
+          ],
+          hub: 'Narrative shift',
+          summaries: ['Commercial accelerating', 'Less federal dependence', 'Earnings catalyst near'],
+        },
+      },
+    ],
+  },
+  {
+    ticker: 'AAPL', name: 'Apple', changePct: 1.4,
+    series: [100,100,101,101,101,102,101,101.4],
+    initials: 'AA', bg: 'linear-gradient(135deg,#0f172a,#475569)',
+    articles: [
+      {
+        id: 'aapl-1', headline: 'Vision platform developer count hits a milestone', source: 'The Verge', publishedAgo: '3h ago',
+        summary: 'Active developer count for the spatial platform crossed a notable threshold.',
+        body: 'Active developers building for the Vision platform crossed a milestone disclosed by management this week. Developer growth is one of the gating items for broader hardware adoption.\nThe headline supports the long-term spatial computing narrative even if near-term unit shipments remain modest.',
+        tree: {
+          root: 'Vision developers',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['AAPL'] }),
+            tBranch('b2', 'Developer growth', { metrics: [tMetric('Active devs', 1.6)] }),
+            tBranch('b3', 'Spatial platform', { metrics: [tMetric('Adoption', 0.8)] }),
+            tBranch('b4', 'Hardware cycle', { metrics: [tMetric('Units', 0.3)] }),
+          ],
+          hub: 'Long-term thesis',
+          summaries: ['Developer flywheel turns', 'Hardware adoption lags', 'Narrative reinforced'],
+        },
+      },
+      {
+        id: 'aapl-2', headline: 'Services revenue at all-time high again', source: 'Bloomberg', publishedAgo: '7h ago',
+        summary: 'Subscription mix continues to lift gross margin and steady the cycle.',
+        body: 'Services revenue printed at an all-time high for the quarter, helping smooth the hardware cycle. Subscription mix continues to expand as App Store, Cloud, and Apple Care all grow.\nGross margin benefits from the mix shift even as average selling prices on hardware soften.',
+        tree: {
+          root: 'Services revenue',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['AAPL'] }),
+            tBranch('b2', 'Services mix', { metrics: [tMetric('Revenue', 1.4)] }),
+            tBranch('b3', 'Gross margin', { metrics: [tMetric('Mix lift', 0.8)] }),
+            tBranch('b4', 'Hardware ASP', { metrics: [tMetric('Trend', -0.3)] }),
+          ],
+          hub: 'Margin profile',
+          summaries: ['ATH services print', 'Subscription compounding', 'Hardware ASP softens'],
+        },
+      },
+    ],
+  },
+  {
+    ticker: 'AMZN', name: 'Amazon', changePct: 0.6,
+    series: [100,100,100,100,100,101,100,100.6],
+    initials: 'AM', bg: 'linear-gradient(135deg,#f97316,#dc2626)',
+    articles: [
+      {
+        id: 'amzn-1', headline: 'Logistics network flips to faster lanes', source: 'Bloomberg', publishedAgo: '4h ago',
+        summary: 'Same-day fulfillment expansion lifts retail margins and customer cohorts.',
+        body: 'Amazon expanded same-day fulfillment to additional metros, lifting both customer cohort retention and retail segment margins. The build-out also reduces last-mile dependency on third-party carriers.\nAnalysts read the move as further support for the retail margin expansion thesis underpinning consensus FY estimates.',
+        tree: {
+          root: 'Same-day expansion',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['AMZN'] }),
+            tBranch('b2', 'Retail margin', { metrics: [tMetric('Lift', 1.0)] }),
+            tBranch('b3', 'Last-mile', { metrics: [tMetric('3P dependence', -0.6)] }),
+            tBranch('b4', 'Cohort', { metrics: [tMetric('Retention', 0.8)] }),
+          ],
+          hub: 'Margin path',
+          summaries: ['Network rollout pays off', '3P dependence drops', 'Cohort metrics improve'],
+        },
+      },
+      {
+        id: 'amzn-2', headline: 'AWS backlog approaches record after AI deals', source: 'WSJ', publishedAgo: '11h ago',
+        summary: 'Recent AI infrastructure agreements push the cloud backlog near prior peaks.',
+        body: 'Two large AI infrastructure agreements pushed the AWS commitment backlog within striking distance of its prior peak. The deals lock in revenue visibility through the next two fiscal years.\nWith capex running elevated, the backlog data is what investors are pointing to as evidence of disciplined return on the spending.',
+        tree: {
+          root: 'AWS backlog',
+          branches: [
+            tBranch('b1', 'Companies', { symbols: ['AMZN', 'NVDA'] }),
+            tBranch('b2', 'Backlog', { metrics: [tMetric('Commitments', 1.5)] }),
+            tBranch('b3', 'Capex discipline', { metrics: [tMetric('ROI proof', 0.9)] }),
+            tBranch('b4', 'AI deals', { metrics: [tMetric('Two new', 1.2)] }),
+          ],
+          hub: 'Visibility check',
+          summaries: ['Backlog near peak', 'Capex justified', 'FY revenue locked'],
+        },
+      },
+    ],
+  },
+]
+
+type Fundamentals = {
+  ticker: string
+  name: string
+  exchange: string
+  sector: string
+  price: number
+  changePct: number
+  marketCap: string
+  pe: number
+  eps: number
+  dividend: string
+  yearLow: number
+  yearHigh: number
+  series: number[]
+  highlights: string[]
+  initials: string
+  bg: string
+  related: string[]
+}
+
+const FUNDAMENTALS: Record<string, Fundamentals> = {
+  AAPL:  { ticker: 'AAPL',  name: 'Apple Inc.',     exchange: 'NASDAQ', sector: 'Technology',     price: 234.55, changePct:  1.4, marketCap: '$3.4T', pe: 32.1, eps: 7.30,  dividend: '0.4%', yearLow: 164.08, yearHigh: 240.15, series: [220,222,225,228,232,235,231,234.5], highlights: ['Services revenue at all-time high', 'Vision developer count rising', 'Buyback authorization extended'], initials: 'AA', bg: 'linear-gradient(135deg,#0f172a,#475569)', related: ['MSFT', 'GOOGL', 'META', 'NVDA'] },
+  MSFT:  { ticker: 'MSFT',  name: 'Microsoft',      exchange: 'NASDAQ', sector: 'Technology',     price: 412.20, changePct:  0.8, marketCap: '$3.1T', pe: 35.4, eps: 11.65, dividend: '0.7%', yearLow: 309.45, yearHigh: 425.90, series: [400,402,405,408,410,415,409,412.2], highlights: ['Azure AI revenue growth re-accelerating', 'Capex guide raised', 'Government cloud expanding'], initials: 'MS', bg: 'linear-gradient(135deg,#0d9488,#0e7490)', related: ['AAPL', 'GOOGL', 'AMZN', 'NVDA'] },
+  NVDA:  { ticker: 'NVDA',  name: 'Nvidia',         exchange: 'NASDAQ', sector: 'Semiconductors', price: 985.10, changePct:  2.1, marketCap: '$2.7T', pe: 64.2, eps: 15.32, dividend: '0.0%', yearLow: 393.51, yearHigh: 992.80, series: [930,940,955,965,975,980,975,985.1], highlights: ['Data-center segment > 80% of revenue', 'Customer concentration disclosed', 'Next-gen accelerator on track'], initials: 'NV', bg: 'linear-gradient(135deg,#16a34a,#0d9488)', related: ['AVGO', 'AMD', 'MSFT', 'AMZN'] },
+  AMZN:  { ticker: 'AMZN',  name: 'Amazon',         exchange: 'NASDAQ', sector: 'Consumer',       price: 198.34, changePct:  0.6, marketCap: '$1.8T', pe: 41.8, eps: 4.74,  dividend: '0.0%', yearLow: 118.35, yearHigh: 200.60, series: [192,195,196,197,198,199,197,198.3], highlights: ['AWS margin holding', 'Logistics network refresh underway', 'Ads business compounding'], initials: 'AM', bg: 'linear-gradient(135deg,#f97316,#dc2626)', related: ['MSFT', 'GOOGL', 'WMT', 'COST'] },
+  GOOGL: { ticker: 'GOOGL', name: 'Alphabet',       exchange: 'NASDAQ', sector: 'Internet',       price: 162.80, changePct: -0.6, marketCap: '$1.9T', pe: 24.3, eps: 6.70,  dividend: '0.5%', yearLow: 121.46, yearHigh: 175.10, series: [165,164,163,163,163,162,163,162.8], highlights: ['Cloud profitable for full year', 'Search resilient vs. AI competitors', 'Capex elevated through year-end'], initials: 'GO', bg: 'linear-gradient(135deg,#0369a1,#2563eb)', related: ['META', 'MSFT', 'AAPL', 'AMZN'] },
+  META:  { ticker: 'META',  name: 'Meta Platforms', exchange: 'NASDAQ', sector: 'Internet',       price: 478.20, changePct: -0.9, marketCap: '$1.2T', pe: 25.6, eps: 18.69, dividend: '0.4%', yearLow: 274.38, yearHigh: 542.80, series: [482,481,480,479,478,476,479,478.2], highlights: ['Reality Labs spend remains a drag', 'Reels monetization improving', 'Ad pricing tailwinds'], initials: 'ME', bg: 'linear-gradient(135deg,#3b82f6,#6366f1)', related: ['GOOGL', 'AAPL', 'NVDA', 'MSFT'] },
+  TSLA:  { ticker: 'TSLA',  name: 'Tesla',          exchange: 'NASDAQ', sector: 'Auto',           price: 178.90, changePct:  1.4, marketCap: '$565B', pe: 51.2, eps: 3.49,  dividend: '0.0%', yearLow: 138.80, yearHigh: 299.29, series: [175,176,177,178,178,179,177,178.9], highlights: ['Mass-market trim in pipeline', 'Energy storage growth accelerating', 'China deliveries volatile'], initials: 'TS', bg: 'linear-gradient(135deg,#dc2626,#7f1d1d)', related: ['NVDA', 'GOOGL', 'AAPL'] },
+  JPM:   { ticker: 'JPM',   name: 'JPMorgan Chase', exchange: 'NYSE',   sector: 'Financials',     price: 218.50, changePct:  0.9, marketCap: '$623B', pe: 12.8, eps: 17.07, dividend: '2.3%', yearLow: 135.19, yearHigh: 220.40, series: [216,216,217,217,218,218,218,218.5], highlights: ['NII guide raised', 'Credit reserves stable', 'Capital ratios well above requirements'], initials: 'JP', bg: 'linear-gradient(135deg,#1e3a8a,#1d4ed8)', related: ['V', 'BAC', 'GS', 'WFC'] },
+  V:     { ticker: 'V',     name: 'Visa',           exchange: 'NYSE',   sector: 'Financials',     price: 280.45, changePct:  1.0, marketCap: '$556B', pe: 30.5, eps: 9.20,  dividend: '0.7%', yearLow: 227.74, yearHigh: 290.95, series: [276,277,278,278,279,280,279,280.4], highlights: ['Cross-border volumes recovering', 'Tokenization tailwinds', 'New value-added services'], initials: 'VV', bg: 'linear-gradient(135deg,#1e3a8a,#3b82f6)', related: ['MA', 'JPM', 'PYPL', 'COIN'] },
+  XOM:   { ticker: 'XOM',   name: 'Exxon Mobil',    exchange: 'NYSE',   sector: 'Energy',         price: 113.60, changePct: -0.7, marketCap: '$453B', pe: 13.6, eps: 8.35,  dividend: '3.4%', yearLow:  95.77, yearHigh: 123.75, series: [115,115,115,115,114,114,114,113.6], highlights: ['Permian capex on plan', 'Downstream margins normalizing', 'Buyback authorization intact'], initials: 'XO', bg: 'linear-gradient(135deg,#dc2626,#991b1b)', related: ['CVX', 'BP.L', 'SHEL.L'] },
+  COIN:  { ticker: 'COIN',  name: 'Coinbase',       exchange: 'NASDAQ', sector: 'Financials',     price: 218.40, changePct:  2.4, marketCap: '$48B',  pe: 38.9, eps: 5.62,  dividend: '0.0%', yearLow:  60.16, yearHigh: 283.48, series: [212,214,215,216,217,218,217,218.4], highlights: ['Spot-ETF flows record', 'International expansion underway', 'Staking restored in some states'], initials: 'CO', bg: 'linear-gradient(135deg,#2563eb,#1d4ed8)', related: ['V', 'PYPL', 'NVDA'] },
+  PLTR:  { ticker: 'PLTR',  name: 'Palantir',       exchange: 'NYSE',   sector: 'Software',       price:  24.80, changePct:  0.8, marketCap: '$58B',  pe: 65.7, eps: 0.38,  dividend: '0.0%', yearLow:  13.68, yearHigh:  29.90, series: [24.4,24.5,24.5,24.6,24.6,24.8,24.6,24.8], highlights: ['Federal pipeline expanding', 'Commercial AIP traction', 'Cash generation positive'], initials: 'PL', bg: 'linear-gradient(135deg,#0f172a,#334155)', related: ['NVDA', 'MSFT', 'AMZN', 'IONQ'] },
+}
+
+function getFundamentals(symbol: string): Fundamentals {
+  return FUNDAMENTALS[symbol] ?? {
+    ticker: symbol,
+    name: symbol,
+    exchange: 'NYSE',
+    sector: 'Diversified',
+    price: 100,
+    changePct: 0.5,
+    marketCap: '—',
+    pe: 18,
+    eps: 5.5,
+    dividend: '1.2%',
+    yearLow: 90,
+    yearHigh: 115,
+    series: [98, 99, 100, 100, 101, 100, 101, 100.5],
+    highlights: [
+      'No detailed fundamentals available for this ticker yet.',
+      'Tap the watchlist or news feed for ticker-specific updates.',
+    ],
+    initials: symbol.replace(/[^A-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'XX',
+    bg: 'linear-gradient(135deg,#0369a1,#0d9488)',
+    related: [],
+  }
+}
+
+const FundCtx = React.createContext<((sym: string) => void) | null>(null)
+function useFund() { return useContext(FundCtx) }
+
+const TICKER_DOMAIN: Record<string, string> = {
+  AAPL: 'apple.com',
+  MSFT: 'microsoft.com',
+  NVDA: 'nvidia.com',
+  AMZN: 'amazon.com',
+  GOOGL: 'abc.xyz',
+  META: 'meta.com',
+  TSLA: 'tesla.com',
+  SHOP: 'shopify.com',
+  SNOW: 'snowflake.com',
+  DASH: 'doordash.com',
+  COIN: 'coinbase.com',
+  PLTR: 'palantir.com',
+  NET: 'cloudflare.com',
+  IONQ: 'ionq.com',
+  CELH: 'celsiusholdings.com',
+  AXSM: 'axsome.com',
+  INSM: 'insmed.com',
+  CVNA: 'carvana.com',
+  SMCI: 'supermicro.com',
+  JPM: 'jpmorganchase.com',
+  V: 'visa.com',
+  XOM: 'exxonmobil.com',
+  JNJ: 'jnj.com',
+  WMT: 'walmart.com',
+  BA: 'boeing.com',
+  CAT: 'caterpillar.com',
+  KO: 'coca-colacompany.com',
+  CVX: 'chevron.com',
+  AVGO: 'broadcom.com',
+  COST: 'costco.com',
+  'AZN.L': 'astrazeneca.com',
+  'SHEL.L': 'shell.com',
+  'HSBA.L': 'hsbc.com',
+  'ULVR.L': 'unilever.com',
+  'BP.L': 'bp.com',
+  'GSK.L': 'gsk.com',
+  'BARC.L': 'barclays.com',
+  '7203.T': 'toyota-global.com',
+  '6758.T': 'sony.com',
+  '9984.T': 'softbank.jp',
+  '6861.T': 'keyence.com',
+  '8035.T': 'tel.com',
+  '9983.T': 'fastretailing.com',
+  '6098.T': 'recruit.co.jp',
+}
+
+function tickerLogoUrls(ticker: string): string[] {
+  const urls: string[] = []
+  const domain = TICKER_DOMAIN[ticker]
+  if (domain) urls.push(`https://logo.clearbit.com/${domain}`)
+  if (/^[A-Z]{1,5}$/.test(ticker)) {
+    urls.push(`https://financialmodelingprep.com/image-stock/${ticker}.png`)
+  }
+  return urls
+}
+
+function CompanyLogo({ ticker, initials, bg, size = 40 }: { ticker?: string; initials: string; bg: string; size?: number }) {
+  const urls = useMemo(() => (ticker ? tickerLogoUrls(ticker) : []), [ticker])
+  const [idx, setIdx] = useState(0)
+  useEffect(() => { setIdx(0) }, [ticker])
+  const url = urls[idx]
+  const showImg = !!url
+  return (
+    <span
+      className={`co-logo${showImg ? ' co-logo--img' : ''}`}
+      style={{ width: size, height: size, background: showImg ? '#fff' : bg, fontSize: size * 0.36 }}
+      aria-hidden
+    >
+      {showImg ? (
+        <img
+          key={url}
+          src={url}
+          alt=""
+          loading="lazy"
+          onError={() => setIdx((i) => i + 1)}
+        />
+      ) : (
+        initials
+      )}
+    </span>
+  )
+}
+
+function TickerChip({ symbol, size = 'md' }: { symbol: string; size?: 'sm' | 'md' }) {
+  const open = useFund()
+  return (
+    <button
+      type="button"
+      className={`ticker-chip ticker-chip--${size}`}
+      onClick={(e) => { e.stopPropagation(); open?.(symbol) }}
+      aria-label={`Open fundamentals for ${symbol}`}
+    >
+      <span className="ticker-chip__dollar" aria-hidden>$</span>
+      <span className="ticker-chip__sym">{symbol}</span>
+    </button>
+  )
+}
+
+function FundamentalsDrawer({ symbol, onClose, onOpenRelated }: { symbol: string | null; onClose: () => void; onOpenRelated: (sym: string) => void }) {
+  useEffect(() => {
+    if (!symbol) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [symbol])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    if (symbol) window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [symbol, onClose])
+
+  if (!symbol) return null
+  const f = getFundamentals(symbol)
+  const direction: ImpactArrow = f.changePct > 0 ? 'up' : f.changePct < 0 ? 'down' : 'flat'
+
+  return createPortal(
+    <div className="fund-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="fund-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fund-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="fund-drawer__handle" aria-hidden />
+        <div className="fund-drawer__head">
+          <CompanyLogo ticker={f.ticker} initials={f.initials} bg={f.bg} size={48} />
+          <div className="fund-drawer__head-text">
+            <p className="fund-drawer__ticker">${f.ticker} · {f.exchange}</p>
+            <h3 id="fund-title" className="fund-drawer__name">{f.name}</h3>
+            <p className="fund-drawer__sector">{f.sector}</p>
+          </div>
+          <button type="button" className="fund-drawer__close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <div className="fund-drawer__price-row">
+          <span className="fund-drawer__price">${f.price.toFixed(2)}</span>
+          <span className={`fund-drawer__change fund-drawer__change--${direction}`}>
+            {f.changePct > 0 ? '+' : ''}{f.changePct.toFixed(2)}%
+          </span>
+        </div>
+        <ImpactSparkline series={f.series} direction={direction} height={50} />
+
+        <div className="fund-drawer__grid">
+          <div className="fund-stat"><span>Market cap</span><strong>{f.marketCap}</strong></div>
+          <div className="fund-stat"><span>P/E</span><strong>{f.pe.toFixed(1)}</strong></div>
+          <div className="fund-stat"><span>EPS</span><strong>${f.eps.toFixed(2)}</strong></div>
+          <div className="fund-stat"><span>Dividend</span><strong>{f.dividend}</strong></div>
+          <div className="fund-stat"><span>52w low</span><strong>${f.yearLow.toFixed(2)}</strong></div>
+          <div className="fund-stat"><span>52w high</span><strong>${f.yearHigh.toFixed(2)}</strong></div>
+        </div>
+
+        <div className="fund-drawer__highlights">
+          <p className="fund-drawer__highlights-label">Highlights</p>
+          <ul>{f.highlights.map((h, i) => <li key={i}>{h}</li>)}</ul>
+        </div>
+
+        {f.related.length > 0 && (
+          <div className="fund-drawer__related">
+            <p className="fund-drawer__related-label">Related stocks</p>
+            <ul className="fund-drawer__related-list">
+              {f.related.map((sym) => {
+                const r = getFundamentals(sym)
+                const direction: ImpactArrow = r.changePct > 0 ? 'up' : r.changePct < 0 ? 'down' : 'flat'
+                return (
+                  <li key={sym}>
+                    <button
+                      type="button"
+                      className="fund-related"
+                      onClick={() => onOpenRelated(sym)}
+                    >
+                      <CompanyLogo ticker={r.ticker} initials={r.initials} bg={r.bg} size={28} />
+                      <span className="fund-related__id">
+                        <span className="fund-related__sym">{r.ticker}</span>
+                        <span className="fund-related__name">{r.name}</span>
+                      </span>
+                      <span className={`fund-related__pct fund-related__pct--${direction}`}>
+                        {r.changePct > 0 ? '+' : ''}{r.changePct.toFixed(1)}%
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function ExchangeSheet({
+  selected,
+  onSelect,
+  onClose,
+}: {
+  selected: FinExchange
+  onSelect: (e: FinExchange) => void
+  onClose: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const filtered = useMemo(
+    () => FIN_EXCHANGES.filter((e) => `${e.name} ${e.region} ${e.code}`.toLowerCase().includes(query.toLowerCase())),
+    [query],
+  )
+  return (
+    <div className="region-backdrop" role="dialog" aria-modal aria-label="Select exchange" onClick={onClose}>
+      <div className="region-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="region-sheet__handle" aria-hidden />
+        <div className="region-sheet__head">
+          <h3 className="region-sheet__title">Select exchange</h3>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="region-sheet__search-wrap">
+          <span className="region-sheet__search-icon" aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" />
+            </svg>
+          </span>
+          <input
+            className="region-search"
+            type="search"
+            placeholder="Search exchanges…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search exchanges"
+          />
+        </div>
+        <ul className="region-list" role="listbox">
+          {filtered.map((e) => (
+            <li key={e.code} role="option" aria-selected={e.code === selected.code}>
+              <button
+                type="button"
+                className={`region-item${e.code === selected.code ? ' region-item--active' : ''}`}
+                onClick={() => { onSelect(e); onClose() }}
+              >
+                <span className="exchange-item__short" aria-hidden>{e.short}</span>
+                <span className="exchange-item__name">
+                  <strong>{e.name}</strong>
+                  <small>{e.region}</small>
+                </span>
+                {e.code === selected.code && (
+                  <svg className="region-item__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                )}
+              </button>
+            </li>
+          ))}
+          {filtered.length === 0 && <li className="city-search-empty">No matching exchange</li>}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+function FinSearchBar({
+  value,
+  onChange,
+  onPick,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onPick: (sym: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const results = useMemo(() => {
+    if (!value.trim()) return []
+    const q = value.toLowerCase()
+    return SEARCH_INSTRUMENTS.filter((i) =>
+      i.symbol.toLowerCase().includes(q) || i.name.toLowerCase().includes(q),
+    ).slice(0, 8)
+  }, [value])
+
+  return (
+    <div className="fin-search-wrap">
+      <span className="fin-search-icon" aria-hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" />
+        </svg>
+      </span>
+      <input
+        className="fin-search"
+        type="search"
+        value={value}
+        placeholder="Search markets, tickers…"
+        onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        aria-label="Search financial instruments"
+      />
+      {open && results.length > 0 && (
+        <ul className="fin-search-results" role="listbox">
+          {results.map((r) => (
+            <li key={r.symbol}>
+              <button
+                type="button"
+                className="fin-search-item"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { onPick(r.symbol); onChange(''); setOpen(false) }}
+              >
+                <span className="fin-search-item__sym">{r.symbol}</span>
+                <span className="fin-search-item__name">{r.name}</span>
+                <span className={`fin-search-item__type fin-search-item__type--${r.type.toLowerCase()}`}>{r.type}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function RangeBar({
+  value,
+  range,
+  goodWhenUp,
+}: {
+  value: number
+  range: EconRange
+  goodWhenUp: boolean
+}) {
+  const span = range.max - range.min
+  const clamp = (n: number) => Math.max(0, Math.min(100, n))
+  const valuePct = clamp(((value - range.min) / span) * 100)
+  const tLowPct = clamp(((range.targetLow - range.min) / span) * 100)
+  const tHighPct = clamp(((range.targetHigh - range.min) / span) * 100)
+  const tWidthPct = Math.max(0, tHighPct - tLowPct)
+  const tCenterPct = (tLowPct + tHighPct) / 2
+
+  const inTarget = value >= range.targetLow && value <= range.targetHigh
+  const aboveTarget = value > range.targetHigh
+  const state: 'in' | 'good' | 'bad' =
+    inTarget ? 'in' : aboveTarget === goodWhenUp ? 'good' : 'bad'
+
+  return (
+    <div className={`range-bar range-bar--${state}`}>
+      <div className="range-bar__track" role="img" aria-label={`${value}% in range ${range.min}%–${range.max}%`}>
+        <div
+          className="range-bar__band"
+          style={{ left: `${tLowPct}%`, width: `${tWidthPct}%` }}
+          aria-hidden
+        />
+        <div className="range-bar__marker" style={{ left: `${valuePct}%` }} aria-hidden>
+          <span className={`range-bar__value range-bar__value--${state}`}>{value.toFixed(1)}%</span>
+        </div>
+      </div>
+      <div className="range-bar__scale">
+        <span className="range-bar__min">{range.min}%</span>
+        <span className="range-bar__target" style={{ left: `${tCenterPct}%` }}>
+          {range.targetLabel}
+        </span>
+        <span className="range-bar__max">{range.max}%</span>
+      </div>
+    </div>
+  )
+}
+
+function EconomicPulse() {
+  return (
+    <article className="fin-card econ-pulse" id="fin-section-econ">
+      <div className="fin-card__head">
+        <h3>Economic pulse</h3>
+        <span className="section-pill">Macro</span>
+      </div>
+      <ul className="econ-list">
+        {ECONOMIC_INDICATORS.map((e) => {
+          const isGood = e.goodWhenUp ? e.delta > 0 : e.delta < 0
+          return (
+            <li key={e.id} className={`econ-row econ-row--${isGood ? 'good' : 'bad'}`}>
+              <div className="econ-row__head">
+                <div className="econ-row__id">
+                  <p className="econ-row__label">{e.label}</p>
+                  <p className="econ-row__trailing">{e.trailing}</p>
+                </div>
+                <div className="econ-row__metric">
+                  <span className="econ-row__value">{e.current}</span>
+                  <span className={`econ-row__delta econ-row__delta--${isGood ? 'good' : 'bad'}`}>
+                    {e.delta > 0 ? '▲' : e.delta < 0 ? '▼' : '·'} {e.delta > 0 ? '+' : ''}{e.delta.toFixed(1)} pp
+                  </span>
+                </div>
+              </div>
+              <RangeBar value={e.currentValue} range={e.range} goodWhenUp={e.goodWhenUp} />
+              <p className="econ-row__story">{e.story}</p>
+              <div className="econ-row__news">
+                <span className="econ-row__news-label">Source</span>
+                <a href="#" className="econ-row__news-link" onClick={(ev) => ev.preventDefault()}>{e.newsHeadline}</a>
+                <span className="econ-row__news-source"> · {e.newsSource}</span>
+              </div>
+              <div className="econ-row__symbols">
+                {e.symbols.map((s) => <TickerChip key={s} symbol={s} size="sm" />)}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </article>
+  )
+}
+
+function sectorTone(pct: number): string {
+  if (pct >= 1.5) return 'sector-tile--up3'
+  if (pct >= 0.5) return 'sector-tile--up2'
+  if (pct > 0)    return 'sector-tile--up1'
+  if (pct === 0)  return 'sector-tile--flat'
+  if (pct > -0.5) return 'sector-tile--down1'
+  if (pct > -1.5) return 'sector-tile--down2'
+  return 'sector-tile--down3'
+}
+
+function SectorHealth() {
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const active = activeId ? FIN_SECTORS.find((s) => s.id === activeId) ?? null : null
+  return (
+    <article className="fin-card" id="fin-section-sector">
+      <div className="fin-card__head">
+        <h3>Sector health</h3>
+        <span className="section-pill">Treemap</span>
+      </div>
+      <p className="fin-card__hint">Tile size = relative weight · color = today's move. Tap for details.</p>
+      <ul className="sector-tree" role="list">
+        {FIN_SECTORS.map((s) => {
+          const isActive = s.id === activeId
+          const area = s.cols * s.rows
+          const sizeClass = area >= 4 ? 'sector-tile--lg' : area >= 2 ? 'sector-tile--md' : 'sector-tile--sm'
+          const lead = s.topCompanies[0]
+          return (
+            <li
+              key={s.id}
+              style={{ gridColumn: `span ${s.cols}`, gridRow: `span ${s.rows}` }}
+            >
+              <button
+                type="button"
+                className={`sector-tile ${sectorTone(s.changePct)} ${sizeClass}${isActive ? ' sector-tile--active' : ''}`}
+                onClick={() => setActiveId(isActive ? null : s.id)}
+                aria-pressed={isActive}
+              >
+                <span className="sector-tile__head">
+                  <span className="sector-tile__name">{s.name}</span>
+                  {area >= 2 && <span className="sector-tile__weight">{s.weight}</span>}
+                </span>
+                <span className="sector-tile__pct">{s.changePct > 0 ? '+' : ''}{s.changePct.toFixed(1)}%</span>
+                {area >= 4 && lead && (
+                  <span className="sector-tile__lead">
+                    <span className="sector-tile__lead-sym">{lead.ticker}</span>
+                    <span className="sector-tile__lead-pct">{lead.changePct > 0 ? '+' : ''}{lead.changePct.toFixed(1)}%</span>
+                  </span>
+                )}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      {active && (
+        <div className="sector-detail">
+          <div className="sector-detail__head">
+            <h4>{active.name}</h4>
+            <span className={`sector-detail__pct sector-detail__pct--${active.changePct >= 0 ? 'up' : 'down'}`}>
+              {active.changePct > 0 ? '+' : ''}{active.changePct.toFixed(1)}%
+            </span>
+          </div>
+          <ul className="sector-detail__list">
+            {active.topCompanies.map((c) => (
+              <li key={c.ticker} className="sector-detail__row">
+                <TickerChip symbol={c.ticker} />
+                <span className={`sector-detail__row-pct sector-detail__row-pct--${c.changePct >= 0 ? 'up' : 'down'}`}>
+                  {c.changePct > 0 ? '+' : ''}{c.changePct.toFixed(1)}%
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="sector-detail__news">
+            <span className="sector-detail__news-label">Related</span>
+            <a href="#" className="sector-detail__news-link" onClick={(ev) => ev.preventDefault()}>{active.newsHeadline}</a>
+            <span className="sector-detail__news-src"> · {active.newsSource}</span>
+          </p>
+        </div>
+      )}
+    </article>
+  )
+}
+
+function parseMarketCap(cap: string): number {
+  const m = cap.match(/([0-9.]+)\s*([TBM])/i)
+  if (!m) return 0
+  const num = parseFloat(m[1])
+  const unit = m[2].toUpperCase()
+  return unit === 'T' ? num * 1000 : unit === 'B' ? num : num / 1000
+}
+
+function capTone(pct: number): string {
+  if (pct >= 1.5) return 'cap-seg--up3'
+  if (pct >= 0.5) return 'cap-seg--up2'
+  if (pct > 0)    return 'cap-seg--up1'
+  if (pct === 0)  return 'cap-seg--flat'
+  if (pct > -0.5) return 'cap-seg--down1'
+  if (pct > -1.5) return 'cap-seg--down2'
+  return 'cap-seg--down3'
+}
+
+function StackedCapBar({ tier, stocks }: { tier: CapTier; stocks: CapStock[] }) {
+  const open = useFund()
+  const [hovered, setHovered] = useState<string | null>(null)
+  const totals = useMemo(() => stocks.map((s) => parseMarketCap(s.marketCap)), [stocks])
+  const sum = totals.reduce((a, b) => a + b, 0) || 1
+  const tierTotalText = sum >= 1000 ? `$${(sum / 1000).toFixed(1)}T` : `$${sum.toFixed(0)}B`
+  const label = tier === 'large' ? 'Large cap' : tier === 'mid' ? 'Mid cap' : 'Small cap'
+
+  return (
+    <div className="cap-bar">
+      <div className="cap-bar__head">
+        <span className="cap-bar__label">{label}</span>
+        <span className="cap-bar__total">{tierTotalText} combined</span>
+      </div>
+
+      <div
+        className="cap-bar__track"
+        role="group"
+        aria-label={`${label} stacked bar by market cap`}
+      >
+        {stocks.map((s, i) => {
+          const widthPct = (totals[i] / sum) * 100
+          const isActive = hovered === s.ticker
+          return (
+            <button
+              key={s.ticker}
+              type="button"
+              className={`cap-seg ${capTone(s.changePct)}${isActive ? ' cap-seg--active' : ''}`}
+              style={{ flex: `${totals[i]} 0 0%` }}
+              onClick={() => open?.(s.ticker)}
+              onMouseEnter={() => setHovered(s.ticker)}
+              onMouseLeave={() => setHovered(null)}
+              onFocus={() => setHovered(s.ticker)}
+              onBlur={() => setHovered(null)}
+              aria-label={`${s.ticker} ${s.name}, ${s.marketCap}, ${s.changePct > 0 ? '+' : ''}${s.changePct.toFixed(1)}%`}
+            >
+              {widthPct >= 9 && (
+                <span className="cap-seg__logo-wrap" aria-hidden>
+                  <CompanyLogo ticker={s.ticker} initials={s.initials} bg={s.bg} size={22} />
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      <ul className="cap-bar__legend cap-bar__legend--grid">
+        {stocks.map((s) => {
+          const direction: ImpactArrow = s.changePct > 0 ? 'up' : s.changePct < 0 ? 'down' : 'flat'
+          const isActive = hovered === s.ticker
+          return (
+            <li
+              key={s.ticker}
+              className={`cap-legend cap-legend--${direction}${isActive ? ' cap-legend--active' : ''}`}
+              onMouseEnter={() => setHovered(s.ticker)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <button
+                type="button"
+                className="cap-legend__btn"
+                onClick={() => open?.(s.ticker)}
+                onFocus={() => setHovered(s.ticker)}
+                onBlur={() => setHovered(null)}
+              >
+                <CompanyLogo ticker={s.ticker} initials={s.initials} bg={s.bg} size={28} />
+                <span className="cap-legend__id">
+                  <span className="cap-legend__sym">{s.ticker}</span>
+                  <span className="cap-legend__name">{s.name}</span>
+                </span>
+                <span className="cap-legend__cap">{s.marketCap}</span>
+                <span className={`cap-legend__pct cap-legend__pct--${direction}`}>
+                  {s.changePct > 0 ? '+' : ''}{s.changePct.toFixed(1)}%
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+const CAP_TIER_ARTICLES: Record<CapTier, StockArticle[]> = {
+  large: [
+    {
+      id: 'lg-1', headline: 'AI capex spending lifts mega-cap tech again', source: 'Bloomberg', publishedAgo: '2h ago',
+      summary: 'Hyperscaler guides reset higher; chips and cloud names co-rally.',
+      image: 'https://picsum.photos/seed/nmf-lg1/120/120',
+      body: 'Two large hyperscalers raised AI capex outlooks, lifting Nvidia and the broader supply chain. Microsoft and Amazon reaffirmed their own infrastructure plans alongside.\nThe co-rally suggests the cycle continues to broaden beyond the single chip leader, with cloud platform vendors now full participants in the upside.',
+      tree: {
+        root: 'AI capex cycle',
+        branches: [
+          tBranch('b1', 'Companies', { symbols: ['NVDA', 'MSFT', 'AMZN'] }),
+          tBranch('b2', 'Hyperscaler capex', { metrics: [tMetric('Outlook', 1.4)] }),
+          tBranch('b3', 'Chip leaders', { metrics: [tMetric('Revenue', 2.1)] }),
+          tBranch('b4', 'Cloud partners', { metrics: [tMetric('Co-rally', 0.8)] }),
+        ],
+        hub: 'Cycle broadens',
+        summaries: ['Beyond single leader', 'Cloud names participate', 'Sustained capex visibility'],
+      },
+    },
+    {
+      id: 'lg-2', headline: 'Ad-tech cohort cools on cross-border data bill', source: 'Reuters', publishedAgo: '6h ago',
+      summary: 'Compliance overhead trims FY revenue assumptions; smallest networks hit hardest.',
+      image: 'https://picsum.photos/seed/nmf-lg2/120/120',
+      body: 'Alphabet and Meta drifted lower as committee language on cross-border data flows raised compliance costs across the auction stack. Sell-side trimmed ad-revenue forecasts.\nLarger names absorb compliance more easily; smaller ad-tech vendors face the steepest cost-of-revenue impact.',
+      tree: {
+        root: 'Ad-tech compliance',
+        branches: [
+          tBranch('b1', 'Companies', { symbols: ['GOOGL', 'META'] }),
+          tBranch('b2', 'Compliance cost', { metrics: [tMetric('Auction stack', -0.9)] }),
+          tBranch('b3', 'Revenue', { metrics: [tMetric('FY trim', -0.6)] }),
+          tBranch('b4', 'Committee vote', { metrics: [tMetric('Bill progress', -0.4)] }),
+        ],
+        hub: 'Cost-of-revenue rises',
+        summaries: ['Smaller networks hit hardest', 'Larger names absorb cost', 'Second reading next quarter'],
+      },
+    },
+  ],
+  mid: [
+    {
+      id: 'md-1', headline: 'Coinbase international roadmap clears two licences', source: 'CoinDesk', publishedAgo: '3h ago',
+      summary: 'EU approvals open the door to perpetual futures launches.',
+      image: 'https://picsum.photos/seed/nmf-md1/120/120',
+      body: 'Coinbase received approval to operate in two additional EU markets, enabling perpetual futures launches for non-US customers. Higher-margin derivatives should lift blended take rates.\nThe approvals also de-risk the international growth narrative which had stalled earlier in the year.',
+      tree: {
+        root: 'COIN international',
+        branches: [
+          tBranch('b1', 'Companies', { symbols: ['COIN'] }),
+          tBranch('b2', 'Perpetual futures', { metrics: [tMetric('Take rate', 1.5)] }),
+          tBranch('b3', 'EU markets', { metrics: [tMetric('Licences', 2.0)] }),
+          tBranch('b4', 'De-risk', { metrics: [tMetric('Narrative', 1.0)] }),
+        ],
+        hub: 'Margin uplift',
+        summaries: ['Two EU markets', 'Higher-margin product', 'International growth restored'],
+      },
+    },
+    {
+      id: 'md-2', headline: 'DoorDash logistics expansion lifts delivery cohort', source: 'WSJ', publishedAgo: '7h ago',
+      summary: 'Same-day expansion patterns echo across delivery economics.',
+      image: 'https://picsum.photos/seed/nmf-md2/120/120',
+      body: 'DoorDash extended same-day fulfillment partnerships with two large national retailers, lifting unit economics on the non-restaurant side of the business. The deals broaden a moat against pure marketplaces.\nThe expansion gives DoorDash more pricing power on the merchant side as the network density compounds.',
+      tree: {
+        root: 'Delivery cohort',
+        branches: [
+          tBranch('b1', 'Companies', { symbols: ['DASH', 'AMZN'] }),
+          tBranch('b2', 'Same-day', { metrics: [tMetric('Coverage', 1.4)] }),
+          tBranch('b3', 'Retail deals', { metrics: [tMetric('Two new', 1.2)] }),
+          tBranch('b4', 'Unit economics', { metrics: [tMetric('Non-restaurant', 0.8)] }),
+        ],
+        hub: 'Moat widens',
+        summaries: ['Pricing power expands', 'Network density grows', 'Merchant-side leverage'],
+      },
+    },
+  ],
+  small: [
+    {
+      id: 'sm-1', headline: 'Super Micro under pressure on guidance reset', source: 'Reuters', publishedAgo: '1h ago',
+      summary: 'AI server demand normalizes; FY revenue guide trimmed.',
+      image: 'https://picsum.photos/seed/nmf-sm1/120/120',
+      body: 'Super Micro pre-announced an FY revenue guide below consensus as AI server demand normalizes from peak ordering levels. Channel checks suggest customers have right-sized inventory.\nThe reset reins in expectations; the longer-term thesis remains intact but unit growth is now back to single digits.',
+      tree: {
+        root: 'SMCI guide reset',
+        branches: [
+          tBranch('b1', 'Companies', { symbols: ['SMCI', 'NVDA'] }),
+          tBranch('b2', 'FY revenue', { metrics: [tMetric('Guide', -1.8)] }),
+          tBranch('b3', 'AI server demand', { metrics: [tMetric('Normalize', -0.9)] }),
+          tBranch('b4', 'Inventory', { metrics: [tMetric('Right-sized', -0.4)] }),
+        ],
+        hub: 'Reset expectations',
+        summaries: ['Single-digit unit growth', 'Long-term thesis intact', 'Channel inventory eased'],
+      },
+    },
+    {
+      id: 'sm-2', headline: 'Quantum hardware pilots gain federal traction', source: 'WSJ', publishedAgo: '8h ago',
+      summary: 'IonQ pilots expand at two federal agencies; pipeline visibility improving.',
+      body: 'IonQ disclosed two federal pilot expansions at agencies running national-security workloads. The pilots are not yet revenue but signal pipeline visibility.\nQuantum hardware names remain speculative; sustained federal pilot growth is the cleanest near-term signal.',
+      tree: {
+        root: 'Quantum pilots',
+        branches: [
+          tBranch('b1', 'Companies', { symbols: ['IONQ', 'PLTR'] }),
+          tBranch('b2', 'Federal pilots', { metrics: [tMetric('New wins', 2.0)] }),
+          tBranch('b3', 'Pipeline', { metrics: [tMetric('Visibility', 1.2)] }),
+          tBranch('b4', 'Revenue', { metrics: [tMetric('Conversion', 0.0)] }),
+        ],
+        hub: 'Speculative signal',
+        summaries: ['Pilots not yet revenue', 'Pipeline broadens', 'Federal traction confirmed'],
+      },
+    },
+  ],
+}
+
+function IndustryMovers() {
+  const openArticle = useArticleOpen()
+  return (
+    <article className="fin-card" id="fin-section-industry">
+      <div className="fin-card__head">
+        <h3>Industry movers</h3>
+        <span className="section-pill">Cap-weighted</span>
+      </div>
+      <p className="fin-card__hint">Segment width = market cap · color = today's move. Tap a segment for fundamentals.</p>
+      {(['large', 'mid', 'small'] as CapTier[]).map((tier) => (
+        <div key={tier} className="cap-tier-block">
+          <StackedCapBar tier={tier} stocks={CAP_STOCKS[tier]} />
+          <div className="cap-tier-news">
+            <p className="cap-tier-news__label">News in this tier</p>
+            <ul className="cap-tier-news__list">
+              {CAP_TIER_ARTICLES[tier].map((a) => (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    className="news-card"
+                    onClick={() => openArticle?.(a)}
+                  >
+                    <p className="news-card__source">{a.source} · {a.publishedAgo}</p>
+                    <div className="news-card__main">
+                      <div className="news-card__content">
+                        <p className="news-card__headline">{a.headline}</p>
+                        <p className="news-card__summary">{a.summary}</p>
+                      </div>
+                      {useNewsImages().show && a.image && <img src={a.image} className="news-card__image" alt="" />}
+                    </div>
+                    <ul className="news-card__symbols">
+                      {Array.from(new Set(a.tree.branches.flatMap((b) => b.symbols ?? []))).slice(0, 4).map((s) => (
+                        <li key={s}><TickerChip symbol={s} size="sm" /></li>
+                      ))}
+                    </ul>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ))}
+    </article>
+  )
+}
+
+function NewsConnections() {
+  return (
+    <article className="fin-card" id="fin-section-news">
+      <div className="fin-card__head">
+        <h3>News &amp; market</h3>
+        <span className="section-pill">Connections</span>
+      </div>
+      <ul className="news-conn-list">
+        {NEWS_CONNECTIONS.map((n) => {
+          const direction: ImpactArrow = n.changePct > 0 ? 'up' : n.changePct < 0 ? 'down' : 'flat'
+          return (
+            <li key={n.id} className={`news-conn news-conn--${direction}`}>
+              <header className="news-conn__head">
+                <ArticleTag tag={n.tag} />
+                <span className={`news-conn__delta news-conn__delta--${direction}`}>
+                  {n.changePct > 0 ? '+' : ''}{n.changePct.toFixed(1)}%
+                </span>
+              </header>
+              <h4 className="news-conn__title">{n.headline}</h4>
+              <div className="news-conn__symbols">
+                {n.symbols.map((s) => <TickerChip key={s} symbol={s} size="sm" />)}
+              </div>
+              <ImpactSparkline series={n.series} direction={direction} height={32} />
+              <p className="news-conn__highlight"><strong>Highlight ·</strong> {n.highlight}</p>
+              <div className="news-conn__grid">
+                <div className="news-conn__cell"><span>What happened</span><p>{n.what}</p></div>
+                <div className="news-conn__cell"><span>Why it happened</span><p>{n.why}</p></div>
+                <div className="news-conn__cell"><span>How it played out</span><p>{n.how}</p></div>
+                <div className="news-conn__cell"><span>What is expected next</span><p>{n.next}</p></div>
+              </div>
+              <p className="news-conn__source">Source · {n.source}</p>
+            </li>
+          )
+        })}
+      </ul>
+    </article>
+  )
+}
+
+const RETURN_HORIZONS = [1, 3, 5, 10] as const
+
+function ReturnEstimator() {
+  const [amountStr, setAmountStr] = useState('')
+  const [years, setYears] = useState<number>(5)
+  const [submitted, setSubmitted] = useState(false)
+
+  const amount = Number(amountStr.replace(/[^0-9.]/g, ''))
+  const valid = amount > 0
+
+  const results = useMemo(() => {
+    if (!valid) return []
+    return RETURN_INSTRUMENTS.map((r) => {
+      const finalValue = amount * Math.pow(1 + r.pct / 100, years)
+      return { ...r, finalValue }
+    }).sort((a, b) => b.finalValue - a.finalValue)
+  }, [amount, years, valid])
+
+  const winner = results[0]?.id
+
+  return (
+    <article className="fin-card" id="fin-section-returns">
+      <div className="fin-card__head">
+        <h3>Return estimator</h3>
+        <span className="section-pill">Projection</span>
+      </div>
+      <p className="fin-card__hint">Enter a hypothetical amount to compare projected returns across instruments.</p>
+
+      <label className="ret-input-wrap">
+        <span className="ret-input-prefix" aria-hidden>$</span>
+        <input
+          type="text"
+          inputMode="decimal"
+          className="ret-input"
+          placeholder="Investment amount"
+          value={amountStr}
+          onChange={(e) => { setAmountStr(e.target.value); setSubmitted(false) }}
+          aria-label="Investment amount"
+        />
+      </label>
+
+      <div className="ret-horizon">
+        <span className="ret-horizon__label">Horizon</span>
+        <div className="ret-horizon__chips" role="radiogroup" aria-label="Time horizon">
+          {RETURN_HORIZONS.map((y) => (
+            <button
+              key={y}
+              type="button"
+              role="radio"
+              aria-checked={years === y}
+              className={`ret-horizon__chip${years === y ? ' ret-horizon__chip--active' : ''}`}
+              onClick={() => { setYears(y); setSubmitted(false) }}
+            >
+              {y}y
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        className="ret-cta"
+        disabled={!valid}
+        onClick={() => setSubmitted(true)}
+      >
+        {submitted ? 'Update projection' : 'Estimate returns'}
+      </button>
+
+      {submitted && valid && (
+        <div className="ret-results" aria-live="polite">
+          <p className="ret-results__intro">
+            Projected value of <strong>${amount.toLocaleString()}</strong> after <strong>{years} year{years > 1 ? 's' : ''}</strong>
+          </p>
+          <ul className="ret-results__list">
+            {results.map((r) => (
+              <li key={r.id} className={`ret-result${winner === r.id ? ' ret-result--winner' : ''}`}>
+                <div className="ret-result__top">
+                  <div>
+                    <span className="ret-result__name">{r.name}</span>
+                    <span className="ret-result__cat">{r.category}</span>
+                  </div>
+                  {winner === r.id && <span className="ret-result__badge">Best return</span>}
+                </div>
+                <div className="ret-result__bar" aria-hidden>
+                  <span style={{ width: `${Math.min(100, (r.pct / 20) * 100)}%`, background: r.color }} />
+                </div>
+                <div className="ret-result__metrics">
+                  <span className="ret-result__metric"><strong>{r.pct.toFixed(1)}%</strong>annual</span>
+                  <span className="ret-result__metric"><strong>${Math.round(r.finalValue).toLocaleString()}</strong>future value</span>
+                  <span className="ret-result__metric ret-result__metric--risk">
+                    <strong>Risk</strong>
+                    <span className="ret-result__risk-bars" aria-label={`Risk ${r.risk} of 5`}>
+                      {[1, 2, 3, 4, 5].map((n) => <i key={n} className={n <= r.risk ? 'on' : ''} />)}
+                    </span>
+                  </span>
+                </div>
+                <p className="ret-result__trend">
+                  <span>Trend ·</span> {r.trendNote}
+                  <span className="ret-result__trend-src"> · {r.newsSource}</span>
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </article>
+  )
+}
+
+type TreeMetric = {
+  label: string
+  direction: 'up' | 'down' | 'flat'
+  pct: number
+}
+
+type TreeBranch = {
+  id: string
+  title: string
+  metrics?: TreeMetric[]
+  symbols?: string[]
+}
+
+type StoryTree = {
+  root: string
+  branches: TreeBranch[]
+  hub: string
+  summaries: string[]
+}
+
+function tMetric(label: string, pct: number): TreeMetric {
+  return { label, direction: pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat', pct }
+}
+
+function tBranch(id: string, title: string, opts: { metrics?: TreeMetric[]; symbols?: string[] } = {}): TreeBranch {
+  return { id, title, ...opts }
+}
+
+type StockArticle = {
+  id: string
+  headline: string
+  source: string
+  publishedAgo: string
+  summary: string
+  body: string
+  tree: StoryTree
+  image?: string
+}
+
+const ArticleCtx = React.createContext<((a: StockArticle) => void) | null>(null)
+function useArticleOpen() { return useContext(ArticleCtx) }
+
+const NewsImagesCtx = React.createContext<{ show: boolean; setShow: (v: boolean) => void }>({ show: true, setShow: () => {} })
+function useNewsImages() { return useContext(NewsImagesCtx) }
+
+const TREE_ZOOM_MIN = 0.5
+const TREE_ZOOM_MAX = 2.5
+const TREE_DRAG_THRESHOLD = 6
+
+function StoryTreeView({ tree }: { tree: StoryTree }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const hubRef = useRef<HTMLDivElement>(null)
+  const branchRefs = useRef<(HTMLDivElement | null)[]>([])
+  const summaryRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  const [scale, setScale] = useState(1)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [paths, setPaths] = useState<string[]>([])
+  const [size, setSize] = useState({ w: 0, h: 0 })
+
+  const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number; dragging: boolean } | null>(null)
+  const pinchRef = useRef<{ initial: number; baseScale: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const vp = viewportRef.current
+    if (!vp) return
+
+    const offsetIn = (el: HTMLElement | null, root: HTMLElement, side: 'top' | 'bottom') => {
+      if (!el) return null
+      let x = el.offsetLeft + el.offsetWidth / 2
+      let y = side === 'top' ? el.offsetTop : el.offsetTop + el.offsetHeight
+      let p: HTMLElement | null = el.offsetParent as HTMLElement | null
+      while (p && p !== root) {
+        x += p.offsetLeft
+        y += p.offsetTop
+        p = p.offsetParent as HTMLElement | null
+      }
+      return { x, y }
+    }
+
+    const compute = () => {
+      setSize({ w: vp.offsetWidth, h: vp.offsetHeight })
+
+      const newPaths: string[] = []
+      const rb = offsetIn(rootRef.current, vp, 'bottom')
+      const ht = offsetIn(hubRef.current, vp, 'top')
+      const hb = offsetIn(hubRef.current, vp, 'bottom')
+
+      if (rb) {
+        branchRefs.current.forEach((el) => {
+          const p = offsetIn(el, vp, 'top')
+          if (p) {
+            const my = (rb.y + p.y) / 2
+            newPaths.push(`M${rb.x},${rb.y} C${rb.x},${my} ${p.x},${my} ${p.x},${p.y}`)
+          }
+        })
+      }
+      if (ht) {
+        branchRefs.current.forEach((el) => {
+          const p = offsetIn(el, vp, 'bottom')
+          if (p) {
+            const my = (p.y + ht.y) / 2
+            newPaths.push(`M${p.x},${p.y} C${p.x},${my} ${ht.x},${my} ${ht.x},${ht.y}`)
+          }
+        })
+      }
+      if (hb) {
+        summaryRefs.current.forEach((el) => {
+          const p = offsetIn(el, vp, 'top')
+          if (p) {
+            const my = (hb.y + p.y) / 2
+            newPaths.push(`M${hb.x},${hb.y} C${hb.x},${my} ${p.x},${my} ${p.x},${p.y}`)
+          }
+        })
+      }
+
+      setPaths(newPaths)
+    }
+
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(vp)
+    return () => ro.disconnect()
+  }, [tree])
+
+  const onWheel = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const delta = -e.deltaY * 0.0015
+    setScale((s) => Math.min(TREE_ZOOM_MAX, Math.max(TREE_ZOOM_MIN, s + delta)))
+  }, [])
+
+  const startDrag = (clientX: number, clientY: number) => {
+    dragRef.current = {
+      startX: clientX,
+      startY: clientY,
+      baseX: pos.x,
+      baseY: pos.y,
+      dragging: false,
+    }
+  }
+
+  const moveDrag = (clientX: number, clientY: number) => {
+    if (!dragRef.current) return
+    const dx = clientX - dragRef.current.startX
+    const dy = clientY - dragRef.current.startY
+    if (!dragRef.current.dragging && Math.hypot(dx, dy) > TREE_DRAG_THRESHOLD) {
+      dragRef.current.dragging = true
+    }
+    if (dragRef.current.dragging) {
+      setPos({ x: dragRef.current.baseX + dx, y: dragRef.current.baseY + dy })
+    }
+  }
+
+  const endDrag = () => {
+    if (dragRef.current?.dragging) {
+      setTimeout(() => { dragRef.current = null }, 0)
+    } else {
+      dragRef.current = null
+    }
+  }
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return
+    startDrag(e.clientX, e.clientY)
+  }
+
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return
+    moveDrag(e.clientX, e.clientY)
+  }
+
+  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') return
+    endDrag()
+  }
+
+  const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      startDrag(e.touches[0].clientX, e.touches[0].clientY)
+    } else if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      pinchRef.current = { initial: Math.hypot(dx, dy), baseScale: scale }
+      dragRef.current = null
+    }
+  }
+
+  const onTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1 && dragRef.current) {
+      moveDrag(e.touches[0].clientX, e.touches[0].clientY)
+    } else if (e.touches.length === 2 && pinchRef.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      const d = Math.hypot(dx, dy)
+      const next = (d / pinchRef.current.initial) * pinchRef.current.baseScale
+      setScale(Math.min(TREE_ZOOM_MAX, Math.max(TREE_ZOOM_MIN, next)))
+    }
+  }
+
+  const onTouchEnd = () => {
+    pinchRef.current = null
+    endDrag()
+  }
+
+  const onClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (dragRef.current?.dragging) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+  }
+
+  const reset = () => { setScale(1); setPos({ x: 0, y: 0 }) }
+  const zoomIn = () => setScale((s) => Math.min(TREE_ZOOM_MAX, s + 0.2))
+  const zoomOut = () => setScale((s) => Math.max(TREE_ZOOM_MIN, s - 0.2))
+
+  return (
+    <div
+      className={`story-tree${dragRef.current?.dragging ? ' story-tree--dragging' : ''}`}
+      ref={containerRef}
+      onWheel={onWheel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onClickCapture={onClickCapture}
+    >
+      <div
+        className="story-tree__viewport"
+        ref={viewportRef}
+        style={{ transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})` }}
+      >
+        <svg className="story-tree__svg" width={size.w} height={size.h} aria-hidden>
+          {paths.map((d, i) => (
+            <path key={i} d={d} fill="none" stroke="currentColor" strokeWidth={1.5} strokeOpacity={0.4} />
+          ))}
+        </svg>
+
+        <div className="story-tree__row story-tree__row--root">
+          <div ref={rootRef} className="tree-root">{tree.root}</div>
+        </div>
+
+        <div className="story-tree__row story-tree__row--branches">
+          {tree.branches.map((b, i) => (
+            <div
+              key={b.id}
+              ref={(el) => { branchRefs.current[i] = el }}
+              className="tree-branch"
+            >
+              <h4 className="tree-branch__title">{b.title}</h4>
+              {b.metrics && b.metrics.length > 0 && (
+                <ul className="tree-branch__metrics">
+                  {b.metrics.map((m, j) => (
+                    <li key={j} className={`tree-metric tree-metric--${m.direction}`}>
+                      <span className="tree-metric__label">{m.label}</span>
+                      <span className="tree-metric__value">
+                        {m.direction === 'up' ? '▲' : m.direction === 'down' ? '▼' : '·'} {m.pct > 0 ? '+' : ''}{m.pct.toFixed(1)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {b.symbols && b.symbols.length > 0 && (
+                <ul className="tree-branch__symbols">
+                  {b.symbols.map((s, k) => (
+                    <li key={k}><TickerChip symbol={s} size="sm" /></li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="story-tree__row story-tree__row--hub">
+          <div ref={hubRef} className="tree-hub">{tree.hub}</div>
+        </div>
+
+        <div className="story-tree__row story-tree__row--summaries">
+          {tree.summaries.map((s, i) => (
+            <div
+              key={i}
+              ref={(el) => { summaryRefs.current[i] = el }}
+              className="tree-summary"
+            >
+              {s}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="story-tree__controls" aria-label="Zoom controls">
+        <button type="button" className="story-tree__ctl" onClick={zoomIn} aria-label="Zoom in">+</button>
+        <button type="button" className="story-tree__ctl" onClick={zoomOut} aria-label="Zoom out">−</button>
+        <button type="button" className="story-tree__ctl" onClick={reset} aria-label="Reset view">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-3-6.7" />
+            <path d="M21 4v6h-6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ArticleDetailScreen({ article, onClose }: { article: StockArticle | null; onClose: () => void }) {
+  useEffect(() => {
+    if (!article) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [article])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    if (article) window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [article, onClose])
+
+  const symbols = useMemo(() => {
+    if (!article) return [] as string[]
+    const set = new Set<string>()
+    article.tree.branches.forEach((b) => b.symbols?.forEach((s) => set.add(s)))
+    return [...set]
+  }, [article])
+
+  if (!article) return null
+
+  const paragraphs = article.body.split('\n').map((p) => p.trim()).filter(Boolean)
+
+  return createPortal(
+    <div className="article-screen" role="dialog" aria-modal="true" aria-label={article.headline}>
+      <header className="article-screen__head">
+        <button type="button" className="icon-btn" onClick={onClose} aria-label="Back">
+          <IconBack />
+        </button>
+        <span className="article-screen__source">{article.source} · {article.publishedAgo}</span>
+        <div style={{ width: 44 }} />
+      </header>
+      <div className="article-screen__body">
+        <h2 className="article-screen__headline">{article.headline}</h2>
+        {symbols.length > 0 && (
+          <div className="article-screen__symbols">
+            {symbols.map((s) => <TickerChip key={s} symbol={s} size="sm" />)}
+          </div>
+        )}
+        <p className="article-screen__summary">{article.summary}</p>
+        {paragraphs.map((p, i) => (
+          <p key={i} className="article-screen__para">{p}</p>
+        ))}
+        <section className="article-screen__map">
+          <div className="article-screen__map-head">
+            <h3 className="article-screen__map-title">Story network</h3>
+            <p className="article-screen__map-hint">Pinch / scroll to zoom · drag to pan · tap a ticker for fundamentals.</p>
+          </div>
+          <StoryTreeView tree={article.tree} />
+        </section>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+type MoverTab = 'trending' | 'index' | 'gainers' | 'losers'
+
+type MoverRow = {
+  ticker: string
+  name: string
+  changePct: number
+  series: number[]
+  initials: string
+  bg: string
+}
+
+function buildMoverPool(): MoverRow[] {
+  const seen = new Set<string>()
+  const out: MoverRow[] = []
+  const push = (r: MoverRow) => {
+    if (seen.has(r.ticker)) return
+    seen.add(r.ticker)
+    out.push(r)
+  }
+  STOCKS_TO_WATCH.forEach((s) => push({ ticker: s.ticker, name: s.name, changePct: s.changePct, series: s.series, initials: s.initials, bg: s.bg }))
+  ;(['large', 'mid', 'small'] as CapTier[]).forEach((tier) => {
+    CAP_STOCKS[tier].forEach((s) => push({ ticker: s.ticker, name: s.name, changePct: s.changePct, series: s.series, initials: s.initials, bg: s.bg }))
+  })
+  return out
+}
+
+function MarketMovers() {
+  const [tab, setTab] = useState<MoverTab>('trending')
+  const open = useFund()
+  const openArticle = useArticleOpen()
+  const pool = useMemo(buildMoverPool, [])
+  const gainers = useMemo(() => [...pool].sort((a, b) => b.changePct - a.changePct).slice(0, 6), [pool])
+  const losers  = useMemo(() => [...pool].sort((a, b) => a.changePct - b.changePct).slice(0, 6), [pool])
+
+  const tabs: { id: MoverTab; label: string }[] = [
+    { id: 'trending', label: 'Trending' },
+    { id: 'index',    label: 'Index' },
+    { id: 'gainers',  label: 'Gainers' },
+    { id: 'losers',   label: 'Losers' },
+  ]
+
+  return (
+    <article className="fin-card" id="fin-section-movers">
+      <div className="fin-card__head">
+        <h3>Markets</h3>
+        <span className="section-pill">Live</span>
+      </div>
+      <div className="mm-tabs" role="tablist" aria-label="Market tabs">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`mm-tab${tab === t.id ? ' mm-tab--active' : ''}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'index' && (
+        <ul className="fin-index-row" aria-label="Indices">
+          {FINANCE_INDICES.map((idx) => {
+            const direction: ImpactArrow = idx.up ? 'up' : 'down'
+            return (
+              <li key={idx.symbol}>
+                <button
+                  type="button"
+                  className={`fin-index-card fin-index-card--${direction}`}
+                  onClick={() => open?.(idx.symbol)}
+                  aria-label={`Open ${idx.fullName} fundamentals`}
+                >
+                  <div className="fin-index-card__top">
+                    <span className="fin-index-card__sym">{idx.symbol}</span>
+                    <span className="fin-index-card__region">{idx.region}</span>
+                  </div>
+                  <span className="fin-index-card__name">{idx.fullName}</span>
+                  <div className="fin-index-card__metrics">
+                    <span className="fin-index-card__level">{idx.level}</span>
+                    <span className={`fin-index-card__pct fin-index-card__pct--${direction}`}>
+                      {idx.up ? <ArrowUp /> : <ArrowDown />}
+                      {idx.up ? '+' : ''}{idx.pct.toFixed(2)}%
+                    </span>
+                  </div>
+                  <ImpactSparkline series={idx.series} direction={direction} height={42} />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {tab === 'trending' && (
+        <ul className="watch-list">
+          {STOCKS_TO_WATCH.map((s) => {
+            const direction: ImpactArrow = s.changePct > 0 ? 'up' : s.changePct < 0 ? 'down' : 'flat'
+            return (
+              <li key={s.ticker} className={`watch-card watch-card--${direction}`}>
+                <div className="watch-card__top">
+                  <CompanyLogo ticker={s.ticker} initials={s.initials} bg={s.bg} size={42} />
+                  <div className="watch-card__id">
+                    <TickerChip symbol={s.ticker} size="sm" />
+                    <span className="watch-card__name">{s.name}</span>
+                  </div>
+                  <span className={`watch-card__delta watch-card__delta--${direction}`}>
+                    {s.changePct > 0 ? '+' : ''}{s.changePct.toFixed(1)}%
+                  </span>
+                </div>
+                <ImpactSparkline series={s.series} direction={direction} height={32} />
+                <ul className="watch-articles" aria-label={`Articles about ${s.name}`}>
+                  {s.articles.map((a) => (
+                    <li key={a.id}>
+                    <button
+                      type="button"
+                      className="watch-article"
+                      onClick={() => openArticle?.(a)}
+                    >
+                      <div className="watch-article__main">
+                        <div className="watch-article__content">
+                          <span className="watch-article__meta">
+                            <span className="watch-article__source">{a.source}</span>
+                            <span className="watch-article__time">· {a.publishedAgo}</span>
+                          </span>
+                          <span className="watch-article__headline">{a.headline}</span>
+                        </div>
+                        {useNewsImages().show && a.image && <img src={a.image} className="watch-article__image" alt="" />}
+                      </div>
+                    </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {tab !== 'trending' && (
+        <ul className="mm-list">
+          {(tab === 'gainers' ? gainers : losers).map((s, i) => {
+            const direction: ImpactArrow = s.changePct > 0 ? 'up' : s.changePct < 0 ? 'down' : 'flat'
+            return (
+              <li key={s.ticker} className={`mm-row mm-row--${direction}`}>
+                <span className="mm-row__rank">{i + 1}</span>
+                <CompanyLogo ticker={s.ticker} initials={s.initials} bg={s.bg} size={36} />
+                <div className="mm-row__id">
+                  <TickerChip symbol={s.ticker} size="sm" />
+                  <span className="mm-row__name">{s.name}</span>
+                </div>
+                <ImpactSparkline series={s.series} direction={direction} height={26} />
+                <span className={`mm-row__delta mm-row__delta--${direction}`}>
+                  {s.changePct > 0 ? '+' : ''}{s.changePct.toFixed(1)}%
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </article>
+  )
+}
+
+type FinNavSection = {
+  id: string
+  label: string
+}
+
+const FIN_NAV_SECTIONS: FinNavSection[] = [
+  { id: 'fin-section-movers',   label: 'Markets' },
+  { id: 'fin-section-econ',     label: 'Economic pulse' },
+  { id: 'fin-section-sector',   label: 'Sector health' },
+  { id: 'fin-section-industry', label: 'Industry movers' },
+  { id: 'fin-section-news',     label: 'News & market' },
+  { id: 'fin-section-returns',  label: 'Return estimator' },
+  { id: 'fin-section-tips',     label: 'Pro tips' },
+]
+
+/* ── Pro Tips library ─────────────────────────────── */
+type ProTipCategory = 'indicator' | 'pattern' | 'order' | 'strategy' | 'fundamental'
+
+type ProTip = {
+  id: string
+  title: string
+  category: ProTipCategory
+  hook: string
+  body: string
+  exampleSymbol: string
+  exampleNote: string
+}
+
+const PRO_TIP_CATEGORIES: { id: ProTipCategory; label: string }[] = [
+  { id: 'indicator',   label: 'Indicators' },
+  { id: 'pattern',     label: 'Chart patterns' },
+  { id: 'order',       label: 'Order types' },
+  { id: 'strategy',    label: 'Strategies' },
+  { id: 'fundamental', label: 'Fundamentals' },
+]
+
+const PRO_TIPS: ProTip[] = [
+  // Indicators
+  {
+    id: 'macd', title: 'MACD', category: 'indicator',
+    hook: 'A momentum signal built from two moving averages crossing each other.',
+    body: 'MACD (Moving Average Convergence Divergence) compares a fast EMA against a slower one. When the fast line crosses above the slow line, momentum is shifting positive — a "bullish crossover". When it crosses below, momentum is turning negative. The histogram (the gap between MACD and its signal line) flags shifts even earlier. MACD works best on liquid, trending stocks; it gives false signals in choppy, sideways markets.',
+    exampleSymbol: 'NVDA',
+    exampleNote: 'NVDA flashed a bullish MACD crossover in early March; the stock added roughly 15% over the following four weeks.',
+  },
+  {
+    id: 'rsi', title: 'RSI', category: 'indicator',
+    hook: 'A 0–100 score that flags when a stock is overbought or oversold.',
+    body: 'RSI (Relative Strength Index) measures the magnitude of recent price moves. Above 70 the stock is "overbought" (a pullback may be due); below 30 it is "oversold" (a bounce may follow). RSI does not predict direction on its own — strong trends can keep RSI extreme for weeks. Pair it with trend signals like moving averages for confirmation.',
+    exampleSymbol: 'TSLA',
+    exampleNote: 'TSLA hit RSI 78 last month; it consolidated for two weeks before the next leg higher rather than reversing outright.',
+  },
+  {
+    id: 'ma', title: 'Moving averages', category: 'indicator',
+    hook: 'Smoothed price lines that strip out daily noise to show the underlying trend.',
+    body: 'A simple moving average (SMA) is the average closing price over N days. The 50-day and 200-day SMAs are the most-watched. When price holds above the 200-day SMA, the long-term trend is up; below it the trend is down. The "golden cross" (50-day crossing above 200-day) is a long-term bullish signal; the "death cross" is its bearish counterpart.',
+    exampleSymbol: 'AAPL',
+    exampleNote: 'AAPL has been holding above its 200-day SMA for most of the past year — a structurally bullish backdrop for the stock.',
+  },
+  {
+    id: 'bollinger', title: 'Bollinger Bands', category: 'indicator',
+    hook: 'Price envelopes that widen when volatility rises and pinch when it falls.',
+    body: 'Bollinger Bands plot a moving average plus and minus two standard deviations. Roughly 95% of price action stays inside the bands. Tight bands (a "squeeze") often precede a sharp move; wide bands signal high volatility. Touching the upper band is not automatically a sell — in strong uptrends, price can ride the band for days.',
+    exampleSymbol: 'COIN',
+    exampleNote: 'COIN went through a Bollinger squeeze in February before the spot-ETF news broke and price expanded sharply through the upper band.',
+  },
+  {
+    id: 'volume', title: 'Volume', category: 'indicator',
+    hook: 'How many shares change hands. Confirms or contradicts what the price is doing.',
+    body: 'Volume is the number of shares traded in a session. A breakout on heavy volume is more credible than one on thin volume. A sharp drop on light volume is often a buying opportunity; a drop on heavy volume can signal real distribution. Volume by itself is not a buy/sell signal — it adds conviction (or doubt) to other signals.',
+    exampleSymbol: 'PLTR',
+    exampleNote: 'PLTR\'s recent breakout came on volume 2.5× its 20-day average — the kind of confirmation that supports follow-through.',
+  },
+
+  // Chart patterns
+  {
+    id: 'candlestick', title: 'Candlestick basics', category: 'pattern',
+    hook: 'Each candle tells you four prices at once: open, high, low, close.',
+    body: 'A candlestick has a body (open to close) and wicks (high and low). Green/white means close above open (buyers won the session); red/black means close below open (sellers won). The body shows conviction; the wicks show rejection. Long lower wicks suggest dip-buyers stepped in; long upper wicks suggest sellers showed up at higher prices.',
+    exampleSymbol: 'AMZN',
+    exampleNote: 'AMZN printed a long lower wick on a recent down-day — buyers absorbed the morning sell-off and the stock closed near session highs.',
+  },
+  {
+    id: 'doji-hammer', title: 'Doji & hammer', category: 'pattern',
+    hook: 'Two reversal candles to know: indecision (doji) and a buyer rejection (hammer).',
+    body: 'A doji has a tiny body — open and close are close together — signalling indecision after a trend. A hammer has a small body at the top with a long lower wick, showing buyers reclaimed control after sellers pushed price down. Both are most meaningful at extremes — bottoms after a downtrend, or tops after an uptrend.',
+    exampleSymbol: 'META',
+    exampleNote: 'META printed a clear hammer at its 200-day SMA last quarter — that low has held since.',
+  },
+  {
+    id: 'head-shoulders', title: 'Head & shoulders', category: 'pattern',
+    hook: 'A classic three-peak topping pattern — left shoulder, higher head, right shoulder.',
+    body: 'Head & shoulders is a reversal pattern that appears after an uptrend: a peak, a higher peak, then a lower peak. The "neckline" connects the two troughs in between. A break below the neckline confirms the pattern and projects a price target down by the height of the head. The inverse pattern (upside down) signals a bullish reversal at bottoms.',
+    exampleSymbol: 'TSLA',
+    exampleNote: 'TSLA traced an inverse head & shoulders into its November low; the breakout above the neckline kicked off the rally that followed.',
+  },
+
+  // Order types
+  {
+    id: 'market-limit', title: 'Market vs. limit order', category: 'order',
+    hook: 'Two ways to buy: "right now at any price" vs. "only at this price or better".',
+    body: 'A market order executes immediately at whatever price is available — fast, but you may pay slippage in fast markets. A limit order specifies the maximum price you\'ll pay (or minimum you\'ll accept on a sell). It may not fill if the market never reaches your price. Use market orders when speed matters; use limit orders when price matters more than fill certainty.',
+    exampleSymbol: 'NVDA',
+    exampleNote: 'On NVDA, where bid-ask can widen on news, a limit order avoids paying $5–$10 of slippage during volatile minutes.',
+  },
+  {
+    id: 'stop-loss', title: 'Stop loss', category: 'order',
+    hook: 'A pre-set sell trigger that limits how much you can lose on a position.',
+    body: 'A stop loss converts to a market order once the trigger price is hit. Set it where your thesis is broken — not at an arbitrary percentage. A stop too tight will be hit on normal noise; too loose, and the loss compounds. A "trailing stop" follows the stock up as it rises, locking in gains on the way back down.',
+    exampleSymbol: 'COIN',
+    exampleNote: 'A COIN long with a 12% stop below the breakout level lets you ride volatility without bailing on every shake-out.',
+  },
+
+  // Strategies
+  {
+    id: 'short-selling', title: 'Short selling', category: 'strategy',
+    hook: 'Profit when a stock falls — by borrowing shares to sell, then buying back lower.',
+    body: 'You borrow shares from a broker, sell them at the current price, and buy them back later (hopefully cheaper) to return them. The difference is your profit. Risk is asymmetric: gains capped at 100% (stock goes to zero), losses unlimited (stock can keep rising). Shorting also costs borrow fees, and short squeezes can force exits at the worst possible time.',
+    exampleSymbol: 'SMCI',
+    exampleNote: 'SMCI shorts who covered into the recent guidance reset captured a 30%+ drawdown — but the path was punctuated by sharp short squeezes.',
+  },
+  {
+    id: 'put-options', title: 'Put options', category: 'strategy',
+    hook: 'A contract that profits when a stock falls below a strike price by expiry.',
+    body: 'A put gives the buyer the right (not obligation) to sell shares at a fixed strike price by an expiry date. If the stock falls below the strike, the put gains value. Maximum loss is the premium paid; maximum gain is the strike (if the stock goes to zero). Puts are used both as bearish bets and as portfolio insurance against drawdowns.',
+    exampleSymbol: 'TSLA',
+    exampleNote: 'A TSLA $150 put bought before earnings cost ~$3; it printed $9 when the stock dropped to $140 the next morning.',
+  },
+  {
+    id: 'call-options', title: 'Call options', category: 'strategy',
+    hook: 'A contract that profits when a stock rises above a strike price by expiry.',
+    body: 'A call gives the buyer the right to buy shares at a fixed strike price by expiry. If the stock rises above the strike, the call gains value. Maximum loss is the premium paid; maximum gain is unlimited. Calls offer leveraged upside on a small outlay, but time decay (theta) eats the option as expiry approaches if the stock doesn\'t move.',
+    exampleSymbol: 'NVDA',
+    exampleNote: 'A weekly NVDA call bought into a known catalyst can multiply 5-10× on a strong move — or expire worthless if the catalyst disappoints.',
+  },
+
+  // Fundamentals
+  {
+    id: 'pe-ratio', title: 'P/E ratio', category: 'fundamental',
+    hook: 'Price divided by earnings per share. How much you pay for $1 of profit.',
+    body: 'P/E = stock price ÷ earnings per share (EPS). A P/E of 20 means investors pay $20 for every $1 of annual earnings. High P/E suggests growth expectations; low P/E suggests skepticism (or a value opportunity). Compare P/E to peers in the same sector — a software P/E of 30 is normal; for an oil major it would be high.',
+    exampleSymbol: 'AAPL',
+    exampleNote: 'AAPL trades at ~32× earnings — premium to the broader market because investors price in services growth, not just hardware.',
+  },
+  {
+    id: 'dividend-yield', title: 'Dividend yield', category: 'fundamental',
+    hook: 'Annual dividend divided by stock price. The cash return you collect just for holding.',
+    body: 'Dividend yield = annual dividend per share ÷ stock price, expressed as a percentage. A 3% yield means you collect $3 in dividends for every $100 invested. Steady yields signal a mature, cash-generative business; very high yields can signal stress (the price has fallen, which inflates the ratio). Watch the payout ratio — dividends paid out of free cash flow are sustainable; out of debt are not.',
+    exampleSymbol: 'XOM',
+    exampleNote: 'XOM yields ~3.4% — well-covered by free cash flow even at lower oil prices, which is why income investors hold it.',
+  },
+  {
+    id: 'beta', title: 'Beta', category: 'fundamental',
+    hook: 'How much a stock typically moves relative to the broader market.',
+    body: 'Beta of 1.0 means the stock moves in line with the market (S&P 500). Beta of 1.5 means it moves 50% more than the market — up and down. Beta of 0.5 means it moves only half as much. High-beta stocks (tech, small-cap) amplify both rallies and drawdowns; low-beta stocks (utilities, consumer staples) cushion volatility but lag in bull markets.',
+    exampleSymbol: 'NVDA',
+    exampleNote: 'NVDA\'s beta is roughly 1.7 — when the market rises 1%, it tends to rise about 1.7%; the asymmetry cuts both ways.',
+  },
+]
+
+const ProTipCtx = React.createContext<((tip: ProTip) => void) | null>(null)
+function useProTipOpen() { return useContext(ProTipCtx) }
+
+function ProTips() {
+  const [filter, setFilter] = useState<ProTipCategory | 'all'>('all')
+  const open = useProTipOpen()
+  const filtered = useMemo(() => {
+    return filter === 'all' ? PRO_TIPS : PRO_TIPS.filter((t) => t.category === filter)
+  }, [filter])
+
+  return (
+    <article className="fin-card" id="fin-section-tips">
+      <div className="fin-card__head">
+        <h3>Pro tips</h3>
+        <span className="section-pill">Library</span>
+      </div>
+      <p className="fin-card__hint">Plain-English explainers with stock examples. Tap a card to read the full tip.</p>
+
+      <div className="tips-filters" role="tablist" aria-label="Tip categories">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={filter === 'all'}
+          className={`tips-filter${filter === 'all' ? ' tips-filter--active' : ''}`}
+          onClick={() => setFilter('all')}
+        >All</button>
+        {PRO_TIP_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            role="tab"
+            aria-selected={filter === c.id}
+            className={`tips-filter${filter === c.id ? ' tips-filter--active' : ''}`}
+            onClick={() => setFilter(c.id)}
+          >{c.label}</button>
+        ))}
+      </div>
+
+      <ul className="tips-grid">
+        {filtered.map((t) => (
+          <li key={t.id}>
+            <button
+              type="button"
+              className={`tip-card tip-card--${t.category}`}
+              onClick={() => open?.(t)}
+            >
+              <span className={`tip-card__cat tip-card__cat--${t.category}`}>
+                {PRO_TIP_CATEGORIES.find((c) => c.id === t.category)?.label}
+              </span>
+              <h4 className="tip-card__title">{t.title}</h4>
+              <p className="tip-card__hook">{t.hook}</p>
+              <span className="tip-card__example">${t.exampleSymbol}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </article>
+  )
+}
+
+function ProTipDetailScreen({ tip, onClose }: { tip: ProTip | null; onClose: () => void }) {
+  useEffect(() => {
+    if (!tip) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [tip])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    if (tip) window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [tip, onClose])
+
+  if (!tip) return null
+
+  const fund = getFundamentals(tip.exampleSymbol)
+  const direction: ImpactArrow = fund.changePct > 0 ? 'up' : fund.changePct < 0 ? 'down' : 'flat'
+  const categoryLabel = PRO_TIP_CATEGORIES.find((c) => c.id === tip.category)?.label
+
+  return createPortal(
+    <div className="article-screen" role="dialog" aria-modal="true" aria-label={tip.title}>
+      <header className="article-screen__head">
+        <button type="button" className="icon-btn" onClick={onClose} aria-label="Back">
+          <IconBack />
+        </button>
+        <span className="article-screen__source">Pro tip · {categoryLabel}</span>
+        <div style={{ width: 44 }} />
+      </header>
+      <div className="article-screen__body">
+        <h2 className="article-screen__headline">{tip.title}</h2>
+        <p className="article-screen__summary">{tip.hook}</p>
+        <p className="article-screen__para">{tip.body}</p>
+        <section className="tip-example">
+          <div className="tip-example__head">
+            <CompanyLogo ticker={fund.ticker} initials={fund.initials} bg={fund.bg} size={36} />
+            <div className="tip-example__id">
+              <p className="tip-example__label">Stock example</p>
+              <TickerChip symbol={tip.exampleSymbol} size="md" />
+            </div>
+            <span className={`tip-example__delta tip-example__delta--${direction}`}>
+              {fund.changePct > 0 ? '+' : ''}{fund.changePct.toFixed(2)}%
+            </span>
+          </div>
+          <ImpactSparkline series={fund.series} direction={direction} height={48} />
+          <p className="tip-example__note">{tip.exampleNote}</p>
+        </section>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+/* ── Quick guide (first-time walkthrough) ─────────── */
+type GuideStep = {
+  title: string
+  body: string
+  scrollTo?: string
+  emoji?: string
+}
+
+const GUIDE_STEPS: GuideStep[] = [
+  {
+    title: 'Welcome to Finance',
+    body: 'A quick tour of how the screen works. You can dismiss this any time and reopen it from the floating menu.',
+    emoji: '👋',
+  },
+  {
+    title: 'Pick an exchange & search',
+    body: 'Use the pill at the top-left to switch exchanges. The search bar finds stocks, indices, ETFs, crypto, and currencies. Tap a result to see its fundamentals.',
+    emoji: '🔍',
+  },
+  {
+    title: 'Markets tabs',
+    body: 'Browse Trending, Index constituents, Top gainers, and Top losers. Tap any ticker to open its fundamentals drawer.',
+    scrollTo: 'fin-section-movers',
+    emoji: '📊',
+  },
+  {
+    title: 'Sector heatmap',
+    body: 'Sectors sized by weight, colored by today\'s move. Tap a tile to see top names and related news.',
+    scrollTo: 'fin-section-sector',
+    emoji: '🟩',
+  },
+  {
+    title: 'Industry movers',
+    body: 'Stacked bars by market cap. Tap a segment for fundamentals; news cards below explain the moves.',
+    scrollTo: 'fin-section-industry',
+    emoji: '📈',
+  },
+  {
+    title: 'Estimate returns',
+    body: 'Type an amount, pick a horizon, and compare projected returns across instruments — bonds, FDs, equities, gold, crypto.',
+    scrollTo: 'fin-section-returns',
+    emoji: '💰',
+  },
+  {
+    title: 'Pro tips library',
+    body: 'A growing library of plain-English explainers — MACD, candlesticks, options, P/E, and more — each with a stock example.',
+    scrollTo: 'fin-section-tips',
+    emoji: '💡',
+  },
+  {
+    title: 'Tickers everywhere',
+    body: 'Anywhere you see a $TICKER pill, tapping it opens that stock\'s fundamentals — including related stocks at the bottom for quick exploration.',
+    emoji: '✨',
+  },
+]
+
+function FinanceGuide({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState(0)
+
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const total = GUIDE_STEPS.length
+  const current = GUIDE_STEPS[step]
+  const isLast = step === total - 1
+
+  const scroll = () => {
+    if (current.scrollTo) {
+      const el = document.getElementById(current.scrollTo)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
+  return createPortal(
+    <div className="guide-backdrop" role="dialog" aria-modal="true" aria-label="Quick guide" onClick={onClose}>
+      <div className="guide-card" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="guide-card__close" onClick={onClose} aria-label="Close guide">×</button>
+        <div className="guide-card__progress" aria-hidden>
+          {GUIDE_STEPS.map((_, i) => (
+            <span key={i} className={`guide-card__dot${i === step ? ' guide-card__dot--active' : ''}${i < step ? ' guide-card__dot--past' : ''}`} />
+          ))}
+        </div>
+        {current.emoji && <span className="guide-card__emoji" aria-hidden>{current.emoji}</span>}
+        <h3 className="guide-card__title">{current.title}</h3>
+        <p className="guide-card__body">{current.body}</p>
+        {current.scrollTo && (
+          <button type="button" className="guide-card__scroll" onClick={scroll}>
+            Show me on screen
+          </button>
+        )}
+        <div className="guide-card__actions">
+          <button
+            type="button"
+            className="guide-card__btn guide-card__btn--ghost"
+            onClick={() => (step === 0 ? onClose() : setStep((s) => s - 1))}
+          >
+            {step === 0 ? 'Skip' : 'Back'}
+          </button>
+          <span className="guide-card__count">{step + 1} / {total}</span>
+          <button
+            type="button"
+            className="guide-card__btn"
+            onClick={() => (isLast ? onClose() : setStep((s) => s + 1))}
+          >
+            {isLast ? 'Got it' : 'Next'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function FinanceFab({ onOpenGuide }: { onOpenGuide: () => void }) {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
+  const goto = (id: string) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setOpen(false)
+  }
+
+  return (
+    <>
+      {open && (
+        <button
+          type="button"
+          className="fin-fab__scrim"
+          aria-label="Close section menu"
+          onClick={() => setOpen(false)}
+        />
+      )}
+      <div className={`fin-fab${open ? ' fin-fab--open' : ''}`}>
+        {open && (
+          <ul className="fin-fab__menu" role="menu" aria-label="Jump to section">
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className="fin-fab__item fin-fab__item--guide"
+                onClick={() => { setOpen(false); onOpenGuide() }}
+              >
+                <span className="fin-fab__item-icon" aria-hidden>?</span>
+                Quick guide
+              </button>
+            </li>
+            {FIN_NAV_SECTIONS.map((s) => (
+              <li key={s.id} role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="fin-fab__item"
+                  onClick={() => goto(s.id)}
+                >
+                  {s.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          type="button"
+          className="fin-fab__btn"
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label={open ? 'Close section menu' : 'Open section menu'}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+          )}
+        </button>
+      </div>
+    </>
+  )
+}
+
+function FinanceScreen() {
+  const [exchange, setExchange] = useState<FinExchange>(FIN_EXCHANGES[0])
+  const [showExchangeSheet, setShowExchangeSheet] = useState(false)
+  const [drawerSym, setDrawerSym] = useState<string | null>(null)
+  const [activeArticle, setActiveArticle] = useState<StockArticle | null>(null)
+  const [activeTip, setActiveTip] = useState<ProTip | null>(null)
+  const [showGuide, setShowGuide] = useState(false)
+  const [search, setSearch] = useState('')
+  const [showNewsImages, setShowNewsImages] = useState(true)
+
+  const openTicker = useCallback((s: string) => setDrawerSym(s), [])
+  const openArticle = useCallback((a: StockArticle) => setActiveArticle(a), [])
+  const openTip = useCallback((t: ProTip) => setActiveTip(t), [])
+
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('nm_finance_guide_seen')) {
+        setShowGuide(true)
+        localStorage.setItem('nm_finance_guide_seen', '1')
+      }
+    } catch { /* ignore */ }
+  }, [])
+
+  return (
+    <ProTipCtx.Provider value={openTip}>
+    <ArticleCtx.Provider value={openArticle}>
+    <FundCtx.Provider value={openTicker}>
+    <NewsImagesCtx.Provider value={{ show: showNewsImages, setShow: setShowNewsImages }}>
+      <section className="finance-screen" aria-label="Finance">
+        <div className="finance-toolbar">
+          <button
+            type="button"
+            className="finance-exchange-pill"
+            onClick={() => setShowExchangeSheet(true)}
+            aria-label={`Exchange: ${exchange.name}. Tap to change.`}
+          >
+            <span className="finance-exchange-pill__short">{exchange.short}</span>
+            <span className="finance-exchange-pill__name">{exchange.name}</span>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          <FinSearchBar value={search} onChange={setSearch} onPick={openTicker} />
+        </div>
+
+        <MarketMovers />
+        <EconomicPulse />
+        <SectorHealth />
+        <IndustryMovers />
+        <NewsConnections />
+        <ReturnEstimator />
+        <ProTips />
+
+        <div className="finance-settings">
+          <div className="finance-settings__head">
+            <h3>Display settings</h3>
+          </div>
+          <div className="fin-switch-row">
+            <span className="fin-switch__label">Show news thumbnails</span>
+            <button
+              type="button"
+              className={`fin-switch${showNewsImages ? ' fin-switch--on' : ''}`}
+              onClick={() => setShowNewsImages(!showNewsImages)}
+              aria-pressed={showNewsImages}
+            >
+              <span className="fin-switch__slider" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <FinanceFab onOpenGuide={() => setShowGuide(true)} />
+
+      {showExchangeSheet && (
+        <ExchangeSheet
+          selected={exchange}
+          onSelect={setExchange}
+          onClose={() => setShowExchangeSheet(false)}
+        />
+      )}
+      <FundamentalsDrawer symbol={drawerSym} onClose={() => setDrawerSym(null)} onOpenRelated={(sym) => setDrawerSym(sym)} />
+    </NewsImagesCtx.Provider>
+    </FundCtx.Provider>
+    <ArticleDetailScreen article={activeArticle} onClose={() => setActiveArticle(null)} />
+    </ArticleCtx.Provider>
+    <ProTipDetailScreen tip={activeTip} onClose={() => setActiveTip(null)} />
+    {showGuide && <FinanceGuide onClose={() => setShowGuide(false)} />}
+    </ProTipCtx.Provider>
+  )
+}
+
 /* ── Categories page ──────────────────────────────── */
 function CategoriesPage() {
   const [query, setQuery] = useState('')
@@ -5792,6 +8517,7 @@ export default function App() {
   const [detailStory, setDetailStory] = useState<Story | null>(null)
   const [detailScrollTo, setDetailScrollTo] = useState<TextBookmarkSelection | null>(null)
   const [showBookmarks, setShowBookmarks] = useState(false)
+  const [showFinance, setShowFinance] = useState(false)
   const [readStory, setReadStory] = useState<Story | null>(null)
   const [chronologyStory, setChronologyStory] = useState<Story | null>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
@@ -5893,6 +8619,14 @@ export default function App() {
               <h2 className="logo">Saved</h2>
               <div style={{ width: 44 }} />
             </>
+          ) : showFinance ? (
+            <>
+              <button type="button" className="icon-btn" aria-label="Back" onClick={() => { setShowFinance(false); setNav('home') }}>
+                <IconBack />
+              </button>
+              <h2 className="logo">Finance</h2>
+              <div style={{ width: 44 }} />
+            </>
           ) : (
             <>
               <button
@@ -5932,7 +8666,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className={`main${detailStory ? ' main--detail' : (showBookmarks || nav !== 'home') ? ' main--single' : ''}${nav === 'foryou' && !detailStory && !showBookmarks ? ' main--feed' : ''}`}>
+      <main className={`main${detailStory ? ' main--detail' : (showBookmarks || showFinance || nav !== 'home') ? ' main--single' : ''}${nav === 'foryou' && !detailStory && !showBookmarks && !showFinance ? ' main--feed' : ''}${showFinance ? ' main--finance' : ''}`}>
         {detailStory && (
           <NewsDetailScreen
             story={detailStory}
@@ -5957,6 +8691,9 @@ export default function App() {
             setRefinement={setRefinement}
           />
         )}
+        {!detailStory && !showBookmarks && showFinance && (
+          <FinanceScreen />
+        )}
         {!detailStory && showBookmarks && (
           <div className="bm-screen">
             <BookmarksList
@@ -5969,7 +8706,7 @@ export default function App() {
             />
           </div>
         )}
-        {!detailStory && !showBookmarks && nav === 'home' && (
+        {!detailStory && !showBookmarks && !showFinance && nav === 'home' && (
           <>
         <div className="chips-row">
           {CATEGORY_CHIPS.map((c) => (
@@ -6084,20 +8821,30 @@ export default function App() {
           </div>
         </section>
 
-        <section className="market-section" aria-label="Market trend ticker">
-          <div className="market-bar">
-            <div className="market-bar__label">Market trend</div>
-            <div className="market-marquee">
-              <div className="market-marquee__track">
-                <div className="market-marquee__half">
+        <section className="market-section" aria-label="Finance ticker">
+          <button
+            type="button"
+            className="market-bar market-bar--btn"
+            onClick={() => setShowFinance(true)}
+            aria-label="Open finance screen"
+          >
+            <span className="market-bar__label">Finance</span>
+            <span className="market-marquee" aria-hidden="true">
+              <span className="market-marquee__track">
+                <span className="market-marquee__half">
                   <MarketTickerItems items={MARKET_TICKER} keyPrefix="a" />
-                </div>
-                <div className="market-marquee__half" aria-hidden="true">
+                </span>
+                <span className="market-marquee__half">
                   <MarketTickerItems items={MARKET_TICKER} keyPrefix="b" />
-                </div>
-              </div>
-            </div>
-          </div>
+                </span>
+              </span>
+            </span>
+            <span className="market-bar__chevron" aria-hidden>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </span>
+          </button>
         </section>
 
         <section className="section feed-section" aria-labelledby="feed-heading">
@@ -6148,15 +8895,15 @@ export default function App() {
           </>
         )}
 
-        {!detailStory && !showBookmarks && nav === 'foryou' && (
+        {!detailStory && !showBookmarks && !showFinance && nav === 'foryou' && (
           <FeedScreen prefersReducedMotion={prefersReducedMotion} />
         )}
 
-        {!detailStory && !showBookmarks && nav === 'category' && <CategoriesPage />}
+        {!detailStory && !showBookmarks && !showFinance && nav === 'category' && <CategoriesPage />}
 
-        {!detailStory && !showBookmarks && nav === 'insights' && <CityMapScreen />}
+        {!detailStory && !showBookmarks && !showFinance && nav === 'insights' && <CityMapScreen />}
 
-        {!detailStory && !showBookmarks && nav === 'profile' && (
+        {!detailStory && !showBookmarks && !showFinance && nav === 'profile' && (
           <section className="placeholder-screen" aria-labelledby="profile-heading">
             <h2 id="profile-heading" className="placeholder-screen__title">
               Profile
@@ -6165,7 +8912,7 @@ export default function App() {
           </section>
         )}
 
-        {!detailStory && !showBookmarks && nav !== 'foryou' && (
+        {!detailStory && !showBookmarks && !showFinance && nav !== 'foryou' && (
           <AppFooter brand={brand} />
         )}
       </main>
@@ -6196,6 +8943,7 @@ export default function App() {
       <ShortsStack story={null} onClose={() => {}} prefersReducedMotion={prefersReducedMotion} />
       <ChronologyModal story={chronologyStory} onClose={() => setChronologyStory(null)} />
 
+      {!showFinance && (
       <nav className="bottom-nav" aria-label="Primary">
         <button type="button" className={`nav-item ${nav === 'home' ? 'nav-item--active' : ''}`} onClick={() => setNav('home')}>
           <IconHome active={nav === 'home'} />
@@ -6220,6 +8968,7 @@ export default function App() {
           <span>Log in</span>
         </button>
       </nav>
+      )}
     </div>
   )
 }
