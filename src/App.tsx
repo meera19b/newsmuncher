@@ -5629,7 +5629,605 @@ function TickerChip({ symbol, size = 'md' }: { symbol: string; size?: 'sm' | 'md
   )
 }
 
-function FundamentalsDrawer({ symbol, onClose, onOpenRelated }: { symbol: string | null; onClose: () => void; onOpenRelated: (sym: string) => void }) {
+type StockTimeframe = '1D' | '1W' | '1M' | '6M' | 'YTD' | '1Y' | '5Y'
+
+const STOCK_TIMEFRAMES: { id: StockTimeframe; label: string }[] = [
+  { id: '1D',  label: '1D' },
+  { id: '1W',  label: '1W' },
+  { id: '1M',  label: '1M' },
+  { id: '6M',  label: '6M' },
+  { id: 'YTD', label: 'YTD' },
+  { id: '1Y',  label: '1Y' },
+  { id: '5Y',  label: '5Y' },
+]
+
+type TimeframeCfg = {
+  n: number
+  longTermNet: number
+  noiseAmp: number
+  xLabels: string[]
+}
+
+const STOCK_TIMEFRAME_CFG: Record<StockTimeframe, TimeframeCfg> = {
+  '1D':  { n: 40, longTermNet: 0.012, noiseAmp: 0.004, xLabels: ['9:30', '11:00', '12:30', '14:00', '16:00'] },
+  '1W':  { n: 30, longTermNet: 0.022, noiseAmp: 0.010, xLabels: ['May 14', 'May 15', 'May 18', 'May 19', 'May 20'] },
+  '1M':  { n: 22, longTermNet: 0.038, noiseAmp: 0.018, xLabels: ['Apr 21', 'Apr 28', 'May 5', 'May 12', 'May 20'] },
+  '6M':  { n: 26, longTermNet: 0.078, noiseAmp: 0.034, xLabels: ['Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'May'] },
+  'YTD': { n: 22, longTermNet: 0.064, noiseAmp: 0.028, xLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'] },
+  '1Y':  { n: 52, longTermNet: 0.165, noiseAmp: 0.050, xLabels: ["May '25", 'Aug', 'Nov', 'Feb', 'May'] },
+  '5Y':  { n: 60, longTermNet: 0.620, noiseAmp: 0.110, xLabels: ['2021', '2022', '2023', '2024', '2025', '2026'] },
+}
+
+function hashSeed(s: string): number {
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+function makeRng(seed: number) {
+  let t = seed >>> 0
+  return () => {
+    t = (t + 0x6d2b79f5) >>> 0
+    let r = t
+    r = Math.imul(r ^ (r >>> 15), r | 1)
+    r ^= r + Math.imul(r ^ (r >>> 7), r | 61)
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function generateStockSeries(symbol: string, timeframe: StockTimeframe, currentPrice: number): number[] {
+  const cfg = STOCK_TIMEFRAME_CFG[timeframe]
+  const rng = makeRng(hashSeed(symbol + ':' + timeframe))
+  const walk: number[] = [0]
+  for (let i = 1; i < cfg.n; i++) {
+    walk.push(walk[i - 1] + (rng() - 0.5) * 2)
+  }
+  const min = Math.min(...walk)
+  const max = Math.max(...walk)
+  const noiseRange = max - min || 1
+  const startPrice = currentPrice / (1 + cfg.longTermNet)
+  const last = walk[walk.length - 1]
+  const first = walk[0]
+  return walk.map((v, i) => {
+    const frac = i / (walk.length - 1)
+    const linearBase = startPrice + frac * (currentPrice - startPrice)
+    const linearRaw = first + frac * (last - first)
+    const noise = (v - linearRaw) / noiseRange
+    return linearBase + noise * currentPrice * cfg.noiseAmp
+  })
+}
+
+function niceTicks(min: number, max: number, count = 4): number[] {
+  const range = max - min || 1
+  const step0 = range / count
+  const pow = Math.pow(10, Math.floor(Math.log10(step0)))
+  const norm = step0 / pow
+  const stepMult = norm >= 5 ? 5 : norm >= 2 ? 2 : norm >= 1 ? 1 : 0.5
+  const step = stepMult * pow
+  const start = Math.ceil(min / step) * step
+  const ticks: number[] = []
+  for (let v = start; v <= max + step * 0.001; v += step) ticks.push(Number(v.toFixed(6)))
+  return ticks
+}
+
+function formatPriceTick(v: number): string {
+  if (v >= 1000) return v.toFixed(0)
+  if (v >= 100)  return v.toFixed(0)
+  if (v >= 10)   return v.toFixed(1)
+  return v.toFixed(2)
+}
+
+function StockPriceChart({ symbol, currentPrice }: { symbol: string; currentPrice: number }) {
+  const [timeframe, setTimeframe] = useState<StockTimeframe>('1M')
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
+
+  const series = useMemo(
+    () => generateStockSeries(symbol, timeframe, currentPrice),
+    [symbol, timeframe, currentPrice],
+  )
+
+  const startPrice = series[0]
+  const endPrice = series[series.length - 1]
+  const tfChange = ((endPrice - startPrice) / startPrice) * 100
+  const tfDirection: 'up' | 'down' | 'flat' =
+    tfChange > 0.05 ? 'up' : tfChange < -0.05 ? 'down' : 'flat'
+
+  const W = 360
+  const H = 200
+  const padL = 40
+  const padR = 8
+  const padT = 10
+  const padB = 26
+  const innerW = W - padL - padR
+  const innerH = H - padT - padB
+
+  const dataMin = Math.min(...series)
+  const dataMax = Math.max(...series)
+  const pad = (dataMax - dataMin) * 0.08 || dataMax * 0.01 || 1
+  const yMin = dataMin - pad
+  const yMax = dataMax + pad
+  const yRange = yMax - yMin || 1
+  const ticks = niceTicks(yMin, yMax, 4)
+
+  const xAt = (i: number) => padL + (i / (series.length - 1 || 1)) * innerW
+  const yAt = (v: number) => padT + (1 - (v - yMin) / yRange) * innerH
+
+  const linePts = series.map((v, i) => `${xAt(i)},${yAt(v)}`)
+  const linePath = `M${linePts.join(' L')}`
+  const areaPath = `${linePath} L${xAt(series.length - 1)},${padT + innerH} L${xAt(0)},${padT + innerH} Z`
+
+  const gradId = useId()
+  const stroke = tfDirection === 'up' ? '#16a34a' : tfDirection === 'down' ? '#dc2626' : '#64748b'
+  const fillTop = tfDirection === 'up' ? 'rgba(22,163,74,0.22)' : tfDirection === 'down' ? 'rgba(220,38,38,0.22)' : 'rgba(100,116,139,0.18)'
+  const fillBot = tfDirection === 'up' ? 'rgba(22,163,74,0)'    : tfDirection === 'down' ? 'rgba(220,38,38,0)'    : 'rgba(100,116,139,0)'
+
+  const handleMove = useCallback((e: ReactPointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current
+    if (!svg) return
+    const rect = svg.getBoundingClientRect()
+    const xPx = e.clientX - rect.left
+    const ratio = W / rect.width
+    const svgX = xPx * ratio
+    const frac = Math.max(0, Math.min(1, (svgX - padL) / innerW))
+    const idx = Math.round(frac * (series.length - 1))
+    setHoverIdx(idx)
+  }, [series.length, innerW])
+
+  const handleLeave = useCallback(() => setHoverIdx(null), [])
+
+  const activeIdx = hoverIdx ?? series.length - 1
+  const activePrice = series[activeIdx]
+  const xLabels = STOCK_TIMEFRAME_CFG[timeframe].xLabels
+
+  return (
+    <section className="stock-chart" aria-label={`${symbol} price chart`}>
+      <div className="stock-chart__head">
+        <div className="stock-chart__meta">
+          <span className="stock-chart__hover-price">${activePrice.toFixed(2)}</span>
+          <span className={`stock-chart__hover-delta stock-chart__hover-delta--${tfDirection}`}>
+            {tfChange > 0 ? '+' : ''}{tfChange.toFixed(2)}% · {timeframe}
+          </span>
+        </div>
+      </div>
+
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        className="stock-chart__svg"
+        role="img"
+        aria-label={`${symbol} ${timeframe} price chart`}
+        onPointerMove={handleMove}
+        onPointerDown={handleMove}
+        onPointerLeave={handleLeave}
+        onPointerCancel={handleLeave}
+      >
+        <defs>
+          <linearGradient id={`stockfill-${gradId}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={fillTop} />
+            <stop offset="100%" stopColor={fillBot} />
+          </linearGradient>
+        </defs>
+
+        {ticks.map((t) => (
+          <g key={`grid-${t}`}>
+            <line
+              x1={padL} x2={padL + innerW}
+              y1={yAt(t)} y2={yAt(t)}
+              className="stock-chart__grid"
+            />
+            <text
+              x={padL - 6} y={yAt(t)}
+              className="stock-chart__y-label"
+              textAnchor="end"
+              dominantBaseline="middle"
+            >
+              {formatPriceTick(t)}
+            </text>
+          </g>
+        ))}
+
+        <line
+          x1={padL} x2={padL + innerW}
+          y1={padT + innerH} y2={padT + innerH}
+          className="stock-chart__axis"
+        />
+
+        <path d={areaPath} fill={`url(#stockfill-${gradId})`} stroke="none" />
+        <path
+          d={linePath}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {xLabels.map((lbl, i) => {
+          const x = padL + (i / (xLabels.length - 1)) * innerW
+          return (
+            <text
+              key={`${lbl}-${i}`}
+              x={x}
+              y={padT + innerH + 16}
+              className="stock-chart__x-label"
+              textAnchor={i === 0 ? 'start' : i === xLabels.length - 1 ? 'end' : 'middle'}
+            >
+              {lbl}
+            </text>
+          )
+        })}
+
+        {hoverIdx !== null && (
+          <g pointerEvents="none">
+            <line
+              x1={xAt(hoverIdx)} x2={xAt(hoverIdx)}
+              y1={padT} y2={padT + innerH}
+              className="stock-chart__crosshair"
+            />
+            <circle
+              cx={xAt(hoverIdx)} cy={yAt(activePrice)}
+              r={4}
+              fill={stroke}
+              stroke="var(--bg)"
+              strokeWidth="2"
+            />
+          </g>
+        )}
+      </svg>
+
+      <div className="stock-chart__tabs" role="tablist" aria-label="Timeframe">
+        {STOCK_TIMEFRAMES.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={timeframe === t.id}
+            className={`stock-chart__tab${timeframe === t.id ? ' stock-chart__tab--active' : ''}`}
+            onClick={() => { setTimeframe(t.id); setHoverIdx(null) }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/* ── Stock detail screen ─────────────────────────── */
+
+type StockSectionId =
+  | 'overview' | 'chart' | 'analysis' | 'peers' | 'quarters'
+  | 'pnl' | 'balance' | 'cashflow' | 'ratios' | 'investors' | 'documents'
+
+const STOCK_SECTIONS: { id: StockSectionId; label: string }[] = [
+  { id: 'overview',  label: 'Overview' },
+  { id: 'chart',     label: 'Chart' },
+  { id: 'analysis',  label: 'Analysis' },
+  { id: 'peers',     label: 'Peers' },
+  { id: 'quarters',  label: 'Quarters' },
+  { id: 'pnl',       label: 'P&L' },
+  { id: 'balance',   label: 'Balance' },
+  { id: 'cashflow',  label: 'Cash Flow' },
+  { id: 'ratios',    label: 'Ratios' },
+  { id: 'investors', label: 'Investors' },
+  { id: 'documents', label: 'Documents' },
+]
+
+const QUARTER_LABELS = [
+  'Mar 2023','Jun 2023','Sep 2023','Dec 2023',
+  'Mar 2024','Jun 2024','Sep 2024','Dec 2024',
+  'Mar 2025','Jun 2025','Sep 2025','Dec 2025','Mar 2026',
+]
+const YEAR_LABELS = ['Mar 2017','Mar 2018','Mar 2019','Mar 2020','Mar 2021','Mar 2022','Mar 2023','Mar 2024','Mar 2025','Mar 2026']
+const SHORT_YEAR_LABELS = YEAR_LABELS.slice(-9)
+
+type QuarterRow = {
+  sales: number; expenses: number; opProfit: number; opmPct: number
+  otherInc: number; interest: number; depreciation: number
+  pbt: number; taxPct: number; netProfit: number; eps: number
+}
+type YearRow = QuarterRow & { fy: string }
+type BalanceRow = {
+  fy: string
+  equity: number; reserves: number; borrowings: number; otherLiab: number
+  total: number
+  fixedAssets: number; cwip: number; investments: number; otherAssets: number
+}
+type CashflowRow = { fy: string; operating: number; investing: number; financing: number; net: number }
+type RatioRow = { fy: string; debtorDays: number; inventoryDays: number; ccc: number; roePct: number; rocePct: number }
+type DetailPeer = {
+  ticker: string; name: string; cmp: number; pe: number; marketCap: number
+  divYieldPct: number; npQtr: number; profitVarPct: number; salesQtr: number; salesVarPct: number; rocePct: number
+}
+type ShareholdingSnapshot = { promoter: number; fii: number; dii: number; public: number; gov: number; others: number }
+type DocumentItem = { type: 'Annual Report' | 'Concall' | 'Presentation' | 'Filing'; title: string; date: string }
+
+type StockDetail = {
+  ticker: string; name: string; exchange: string; sector: string; sectorPath: string[]
+  website: string
+  about: string; keyPoints: string[]
+  price: number; changePct: number
+  marketCap: string; pe: number; bookValue: number; divYieldPct: number
+  rocePct: number; roePct: number; high52w: number; low52w: number; faceValue: number
+  initials: string; bg: string
+  pros: string[]; cons: string[]
+  peers: DetailPeer[]
+  quarters: QuarterRow[]
+  pnl: YearRow[]
+  balance: BalanceRow[]
+  cashflow: CashflowRow[]
+  ratios: RatioRow[]
+  shareholding: {
+    latest: ShareholdingSnapshot
+    history: { label: string; snapshot: ShareholdingSnapshot }[]
+  }
+  documents: DocumentItem[]
+  related: string[]
+}
+
+function parseMarketCapToCr(s: string): number {
+  const m = s.match(/^\$?([\d.]+)\s*([TBM])?/i)
+  if (!m) return 50000
+  const val = parseFloat(m[1])
+  const suf = (m[2] ?? '').toUpperCase()
+  const usd = suf === 'T' ? val * 1_000_000 : suf === 'B' ? val * 1_000 : suf === 'M' ? val : val
+  return Math.round(usd * 83)
+}
+
+function formatCr(n: number): string {
+  const abs = Math.abs(n)
+  if (abs >= 1_00_000) return n.toLocaleString('en-IN', { maximumFractionDigits: 0 })
+  return n.toLocaleString('en-IN', { maximumFractionDigits: 0 })
+}
+
+function sectorPathFor(sector: string): string[] {
+  const norm = sector.toLowerCase()
+  if (norm.includes('semi')) return ['Technology', 'Semiconductors']
+  if (norm.includes('tech') || norm.includes('software')) return ['Technology', 'Software & IT']
+  if (norm.includes('internet')) return ['Technology', 'Internet & Media']
+  if (norm.includes('financ')) return ['Financials', 'Diversified Financials']
+  if (norm.includes('energy')) return ['Commodities', 'Energy']
+  if (norm.includes('auto')) return ['Industrials', 'Automotive']
+  if (norm.includes('consumer')) return ['Consumer', 'Consumer Discretionary']
+  if (norm.includes('retail')) return ['Consumer', 'Retail']
+  if (norm.includes('industrial')) return ['Industrials', 'Capital Goods']
+  return ['Diversified', sector]
+}
+
+const STOCK_DETAIL_CACHE = new Map<string, StockDetail>()
+
+function getStockDetail(symbol: string): StockDetail {
+  const cached = STOCK_DETAIL_CACHE.get(symbol)
+  if (cached) return cached
+  const f = getFundamentals(symbol)
+  const rng = makeRng(hashSeed('detail:' + symbol))
+
+  const mcapCr = parseMarketCapToCr(f.marketCap)
+  const baseSales = Math.max(150, Math.round(mcapCr * 0.18))
+  const baseOpm = 0.12 + (rng() - 0.5) * 0.16
+
+  const quarters: QuarterRow[] = QUARTER_LABELS.map((_, i) => {
+    const t = (i - 6) / 12
+    const growth = 1 + t * 0.18 + (rng() - 0.5) * 0.08
+    const sales = Math.max(80, Math.round(baseSales * growth))
+    const opmPct = Math.max(5, Math.min(38, baseOpm * 100 + (rng() - 0.5) * 4))
+    const opProfit = Math.round(sales * opmPct / 100)
+    const expenses = sales - opProfit
+    const otherInc = Math.round((rng() - 0.4) * sales * 0.05)
+    const interest = Math.max(0, Math.round(sales * 0.022 * (0.6 + rng() * 0.8)))
+    const depreciation = Math.max(1, Math.round(sales * 0.038 * (0.7 + rng() * 0.6)))
+    const pbt = opProfit + otherInc - interest - depreciation
+    const taxPct = Math.max(15, Math.min(80, 30 + (rng() - 0.5) * 30))
+    const netProfit = Math.round(pbt * (1 - taxPct / 100))
+    const eps = Number((netProfit / Math.max(1, mcapCr / 100)).toFixed(2))
+    return { sales, expenses, opProfit, opmPct: Math.round(opmPct), otherInc, interest, depreciation, pbt, taxPct: Math.round(taxPct), netProfit, eps }
+  })
+
+  const pnl: YearRow[] = YEAR_LABELS.map((fy, i) => {
+    const t = (i - YEAR_LABELS.length / 2) / 5
+    const growth = 1 + t * 0.55 + (rng() - 0.5) * 0.12
+    const sales = Math.max(600, Math.round(baseSales * 4 * growth))
+    const opmPct = Math.max(5, Math.min(40, baseOpm * 100 + (rng() - 0.5) * 5))
+    const opProfit = Math.round(sales * opmPct / 100)
+    const expenses = sales - opProfit
+    const otherInc = Math.round((rng() - 0.3) * sales * 0.03)
+    const interest = Math.max(0, Math.round(sales * 0.02 * (0.7 + rng() * 0.6)))
+    const depreciation = Math.max(2, Math.round(sales * 0.035 * (0.8 + rng() * 0.4)))
+    const pbt = opProfit + otherInc - interest - depreciation
+    const taxPct = Math.max(15, Math.min(45, 28 + (rng() - 0.5) * 14))
+    const netProfit = Math.round(pbt * (1 - taxPct / 100))
+    const eps = Number((netProfit / Math.max(1, mcapCr / 100)).toFixed(2))
+    return { fy, sales, expenses, opProfit, opmPct: Math.round(opmPct), otherInc, interest, depreciation, pbt, taxPct: Math.round(taxPct), netProfit, eps }
+  })
+
+  const balance: BalanceRow[] = SHORT_YEAR_LABELS.map((fy, i) => {
+    const t = i / SHORT_YEAR_LABELS.length
+    const total = Math.round(mcapCr * (0.6 + t * 0.5 + (rng() - 0.5) * 0.1))
+    const equity = Math.round(total * 0.04)
+    const reserves = Math.round(total * (0.35 + (rng() - 0.5) * 0.08))
+    const borrowings = Math.round(total * (0.22 + (rng() - 0.5) * 0.1))
+    const otherLiab = total - equity - reserves - borrowings
+    const fixedAssets = Math.round(total * (0.42 + (rng() - 0.5) * 0.08))
+    const cwip = Math.round(total * (0.05 + rng() * 0.04))
+    const investments = Math.round(total * (0.18 + (rng() - 0.5) * 0.06))
+    const otherAssets = total - fixedAssets - cwip - investments
+    return { fy, equity, reserves, borrowings, otherLiab, total, fixedAssets, cwip, investments, otherAssets }
+  })
+
+  const cashflow: CashflowRow[] = SHORT_YEAR_LABELS.map((fy) => {
+    const operating = Math.round(mcapCr * (0.06 + (rng() - 0.2) * 0.04))
+    const investing = Math.round(-mcapCr * (0.04 + rng() * 0.03))
+    const financing = Math.round((rng() - 0.5) * mcapCr * 0.05)
+    const net = operating + investing + financing
+    return { fy, operating, investing, financing, net }
+  })
+
+  const ratios: RatioRow[] = SHORT_YEAR_LABELS.map((fy) => ({
+    fy,
+    debtorDays: Math.round(35 + (rng() - 0.5) * 18),
+    inventoryDays: Math.round(45 + (rng() - 0.5) * 22),
+    ccc: Math.round(28 + (rng() - 0.5) * 20),
+    roePct: Number((10 + (rng() - 0.3) * 14).toFixed(1)),
+    rocePct: Number((12 + (rng() - 0.3) * 16).toFixed(1)),
+  }))
+
+  const peersBase = (f.related && f.related.length > 0)
+    ? [...f.related, f.ticker]
+    : [f.ticker, 'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN'].slice(0, 6)
+  const peers: DetailPeer[] = peersBase.slice(0, 7).map((sym) => {
+    const pf = getFundamentals(sym)
+    const pcap = parseMarketCapToCr(pf.marketCap)
+    return {
+      ticker: pf.ticker,
+      name: pf.name,
+      cmp: Number(pf.price.toFixed(2)),
+      pe: Number(pf.pe.toFixed(2)),
+      marketCap: pcap,
+      divYieldPct: Number((parseFloat(pf.dividend) || 0).toFixed(2)),
+      npQtr: Math.round(pcap * 0.012),
+      profitVarPct: Number(((rng() - 0.3) * 80).toFixed(2)),
+      salesQtr: Math.round(pcap * 0.05),
+      salesVarPct: Number(((rng() - 0.3) * 40).toFixed(2)),
+      rocePct: Number((8 + rng() * 20).toFixed(2)),
+    }
+  })
+
+  const baseShare: ShareholdingSnapshot = {
+    promoter: Math.round(42 + (rng() - 0.5) * 18),
+    fii: Math.round(16 + (rng() - 0.5) * 10),
+    dii: Math.round(14 + (rng() - 0.5) * 8),
+    public: 0, gov: Math.round(rng() * 3), others: Math.round(rng() * 2),
+  }
+  baseShare.public = Math.max(0, 100 - baseShare.promoter - baseShare.fii - baseShare.dii - baseShare.gov - baseShare.others)
+  const shareHistoryLabels = ['Mar 2024','Jun 2024','Sep 2024','Dec 2024','Mar 2025','Jun 2025','Sep 2025','Dec 2025','Mar 2026']
+  const shareHistory = shareHistoryLabels.map((label, i) => {
+    const drift = (i - shareHistoryLabels.length / 2) * 0.4
+    const fii = Math.max(2, Math.round(baseShare.fii + drift + (rng() - 0.5) * 1.4))
+    const dii = Math.max(2, Math.round(baseShare.dii - drift * 0.5 + (rng() - 0.5) * 1.2))
+    const promoter = Math.max(20, Math.round(baseShare.promoter + (rng() - 0.5) * 1.2))
+    const gov = baseShare.gov
+    const others = baseShare.others
+    const pub = Math.max(0, 100 - promoter - fii - dii - gov - others)
+    return { label, snapshot: { promoter, fii, dii, public: pub, gov, others } }
+  })
+
+  const documents: DocumentItem[] = [
+    { type: 'Annual Report',  title: `Annual Report FY 2024-25`, date: '15 Jul 2025' },
+    { type: 'Annual Report',  title: `Annual Report FY 2023-24`, date: '12 Jul 2024' },
+    { type: 'Concall',        title: 'Q4 FY26 earnings concall transcript', date: '6 May 2026' },
+    { type: 'Presentation',   title: 'Q4 FY26 investor presentation', date: '4 May 2026' },
+    { type: 'Concall',        title: 'Q3 FY26 earnings concall transcript', date: '3 Feb 2026' },
+    { type: 'Presentation',   title: 'Q3 FY26 investor presentation', date: '1 Feb 2026' },
+    { type: 'Filing',         title: 'Board meeting outcome — buyback consideration', date: '22 Apr 2026' },
+    { type: 'Filing',         title: 'Disclosure under Reg. 30 — debt rating reaffirmed', date: '14 Mar 2026' },
+    { type: 'Concall',        title: 'Q2 FY26 earnings concall transcript', date: '5 Nov 2025' },
+    { type: 'Presentation',   title: 'Capital markets day — strategy 2030', date: '12 Sep 2025' },
+  ]
+
+  const pros: string[] = []
+  const cons: string[] = []
+  const latestQ = quarters[quarters.length - 1]
+  const prevQ = quarters[quarters.length - 5]
+  const profitGrowth = ((latestQ.netProfit - prevQ.netProfit) / Math.max(1, Math.abs(prevQ.netProfit))) * 100
+  if (profitGrowth > 12) pros.push(`Company has delivered profit growth of ${profitGrowth.toFixed(1)}% over the last year.`)
+  if (f.dividend && parseFloat(f.dividend) > 1.2) pros.push(`Company maintains a healthy dividend payout of ${f.dividend}.`)
+  if (ratios[ratios.length - 1].rocePct > 18) pros.push(`Strong return on capital of ${ratios[ratios.length - 1].rocePct.toFixed(1)}%.`)
+  if (latestQ.opmPct > 22) pros.push(`Operating margins remain elevated at ${latestQ.opmPct}%.`)
+  if (pros.length === 0) pros.push('Company has been able to grow sales steadily through the cycle.')
+
+  if (f.pe > 40) cons.push(`Stock trades at a rich P/E of ${f.pe.toFixed(1)}, leaving limited margin of safety.`)
+  if (ratios[ratios.length - 1].roePct < 11) cons.push(`Return on equity has stayed muted around ${ratios[ratios.length - 1].roePct.toFixed(1)}%.`)
+  if (balance[balance.length - 1].borrowings / balance[balance.length - 1].total > 0.28) cons.push('Debt-to-asset ratio is on the higher side relative to peers.')
+  if (profitGrowth < 3) cons.push('Profit growth has been sluggish over the trailing twelve months.')
+  if (cons.length === 0) cons.push('Valuation looks demanding compared to long-term averages.')
+
+  const aboutTemplates: Record<string, string> = {
+    Technology: `${f.name} is a global technology platform with deep distribution and a multi-product business mix. The company operates across geographies with a high-margin software and services tail.`,
+    Semiconductors: `${f.name} designs and supplies semiconductor products used across data center, automotive, and consumer end markets, with deep customer relationships across the supply chain.`,
+    Internet: `${f.name} operates a portfolio of consumer-internet properties and advertising businesses, generating cash flow from a long-tail of users and a smaller premium revenue base.`,
+    Auto: `${f.name} designs, manufactures, and sells vehicles and energy products globally, with vertically-integrated operations across batteries, drivetrains, and software.`,
+    Energy: `${f.name} is an integrated energy major with upstream production, midstream logistics, and downstream refining and marketing exposure across the globe.`,
+    Financials: `${f.name} is a diversified financial-services franchise spanning lending, capital markets, and consumer payments.`,
+    Consumer: `${f.name} operates large-scale consumer distribution and retail networks, supplemented by digital and advertising businesses.`,
+  }
+  const sectorKey = Object.keys(aboutTemplates).find((k) => f.sector.toLowerCase().includes(k.toLowerCase())) ?? 'Technology'
+  const about = aboutTemplates[sectorKey]
+
+  const detail: StockDetail = {
+    ticker: f.ticker,
+    name: f.name,
+    exchange: f.exchange,
+    sector: f.sector,
+    sectorPath: sectorPathFor(f.sector),
+    website: (TICKER_DOMAIN[f.ticker] ?? `${f.ticker.toLowerCase()}.com`),
+    about,
+    keyPoints: f.highlights,
+    price: f.price,
+    changePct: f.changePct,
+    marketCap: f.marketCap,
+    pe: f.pe,
+    bookValue: Number((f.price / Math.max(1.2, 1 + f.pe / 30)).toFixed(2)),
+    divYieldPct: parseFloat(f.dividend) || 0,
+    rocePct: ratios[ratios.length - 1].rocePct,
+    roePct: ratios[ratios.length - 1].roePct,
+    high52w: f.yearHigh,
+    low52w: f.yearLow,
+    faceValue: 1,
+    initials: f.initials,
+    bg: f.bg,
+    pros, cons,
+    peers,
+    quarters, pnl, balance, cashflow, ratios,
+    shareholding: { latest: baseShare, history: shareHistory },
+    documents,
+    related: f.related,
+  }
+  STOCK_DETAIL_CACHE.set(symbol, detail)
+  return detail
+}
+
+function ScrollTable({ headers, sticky = true, rows }: {
+  headers: string[]
+  sticky?: boolean
+  rows: { label: string; values: (string | number)[]; bold?: boolean }[]
+}) {
+  return (
+    <div className={`sd-table-wrap${sticky ? ' sd-table-wrap--sticky' : ''}`}>
+      <table className="sd-table">
+        <thead>
+          <tr>
+            <th className="sd-th sd-th--label" />
+            {headers.map((h) => <th key={h} className="sd-th">{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label}>
+              <th scope="row" className={`sd-th sd-th--label sd-td-label${r.bold ? ' sd-td-label--bold' : ''}`}>{r.label}</th>
+              {r.values.map((v, i) => (
+                <td key={i} className={`sd-td${r.bold ? ' sd-td--bold' : ''}`}>{typeof v === 'number' ? v.toLocaleString('en-IN') : v}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function StockDetailScreen({ symbol, onClose, onOpenRelated }: { symbol: string | null; onClose: () => void; onOpenRelated: (sym: string) => void }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const tabbarRef = useRef<HTMLDivElement | null>(null)
+  const sectionRefs = useRef<Record<StockSectionId, HTMLElement | null>>({
+    overview: null, chart: null, analysis: null, peers: null, quarters: null,
+    pnl: null, balance: null, cashflow: null, ratios: null, investors: null, documents: null,
+  })
+  const [activeSection, setActiveSection] = useState<StockSectionId>('overview')
+
   useEffect(() => {
     if (!symbol) return
     const prev = document.body.style.overflow
@@ -5638,79 +6236,420 @@ function FundamentalsDrawer({ symbol, onClose, onOpenRelated }: { symbol: string
   }, [symbol])
 
   useEffect(() => {
+    if (!symbol) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    if (symbol) window.addEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [symbol, onClose])
 
+  useEffect(() => {
+    if (!symbol) return
+    setActiveSection('overview')
+    requestAnimationFrame(() => { scrollRef.current?.scrollTo({ top: 0 }) })
+  }, [symbol])
+
+  useEffect(() => {
+    const root = scrollRef.current
+    if (!root || !symbol) return
+    const onScroll = () => {
+      const rootTop = root.getBoundingClientRect().top
+      const threshold = rootTop + 110
+      let current: StockSectionId = 'overview'
+      for (const s of STOCK_SECTIONS) {
+        const el = sectionRefs.current[s.id]
+        if (!el) continue
+        const top = el.getBoundingClientRect().top
+        if (top <= threshold) current = s.id
+      }
+      setActiveSection((prev) => (prev === current ? prev : current))
+    }
+    root.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => root.removeEventListener('scroll', onScroll)
+  }, [symbol])
+
+  useEffect(() => {
+    const tab = tabbarRef.current?.querySelector<HTMLElement>(`[data-tab="${activeSection}"]`)
+    tab?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+  }, [activeSection])
+
+  const scrollToSection = useCallback((id: StockSectionId) => {
+    const el = sectionRefs.current[id]
+    const root = scrollRef.current
+    if (!el || !root) return
+    const elRect = el.getBoundingClientRect()
+    const rootRect = root.getBoundingClientRect()
+    const offset = root.scrollTop + (elRect.top - rootRect.top) - 96
+    root.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' })
+  }, [])
+
   if (!symbol) return null
-  const f = getFundamentals(symbol)
-  const direction: ImpactArrow = f.changePct > 0 ? 'up' : f.changePct < 0 ? 'down' : 'flat'
+  const d = getStockDetail(symbol)
+  const direction: ImpactArrow = d.changePct > 0 ? 'up' : d.changePct < 0 ? 'down' : 'flat'
+
+  const quartersHeaders = QUARTER_LABELS
+  const pnlHeaders = YEAR_LABELS
+  const balanceHeaders = SHORT_YEAR_LABELS
+  const cashflowHeaders = SHORT_YEAR_LABELS
+  const ratioHeaders = SHORT_YEAR_LABELS
 
   return createPortal(
-    <div className="fund-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="fund-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="fund-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="fund-drawer__handle" aria-hidden />
-        <div className="fund-drawer__head">
-          <CompanyLogo ticker={f.ticker} initials={f.initials} bg={f.bg} size={48} />
-          <div className="fund-drawer__head-text">
-            <p className="fund-drawer__ticker">${f.ticker} · {f.exchange}</p>
-            <h3 id="fund-title" className="fund-drawer__name">{f.name}</h3>
-            <p className="fund-drawer__sector">{f.sector}</p>
-          </div>
-          <button type="button" className="fund-drawer__close" onClick={onClose} aria-label="Close">
-            ×
+    <div className="sd-screen" role="dialog" aria-modal="true" aria-label={`${d.name} stock details`}>
+      <header className="sd-head">
+        <button type="button" className="sd-head__back" onClick={onClose} aria-label="Back">
+          <IconBack />
+        </button>
+        <div className="sd-head__id">
+          <span className="sd-head__name">{d.name}</span>
+          <span className="sd-head__sub">{d.exchange} · {d.ticker}</span>
+        </div>
+        <button type="button" className="sd-head__action" aria-label="Follow">＋</button>
+      </header>
+
+      <div className="sd-tabbar" ref={tabbarRef} role="tablist" aria-label="Stock sections">
+        {STOCK_SECTIONS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            role="tab"
+            data-tab={s.id}
+            aria-selected={activeSection === s.id}
+            className={`sd-tab${activeSection === s.id ? ' sd-tab--active' : ''}`}
+            onClick={() => scrollToSection(s.id)}
+          >
+            {s.label}
           </button>
-        </div>
+        ))}
+      </div>
 
-        <div className="fund-drawer__price-row">
-          <span className="fund-drawer__price">${f.price.toFixed(2)}</span>
-          <span className={`fund-drawer__change fund-drawer__change--${direction}`}>
-            {f.changePct > 0 ? '+' : ''}{f.changePct.toFixed(2)}%
-          </span>
-        </div>
-        <ImpactSparkline series={f.series} direction={direction} height={50} />
+      <div className="sd-body" ref={scrollRef}>
+        <section
+          id="overview"
+          ref={(el) => { sectionRefs.current.overview = el }}
+          className="sd-section"
+          aria-labelledby="sd-overview-title"
+        >
+          <div className="sd-overview-head">
+            <CompanyLogo ticker={d.ticker} initials={d.initials} bg={d.bg} size={56} />
+            <div className="sd-overview-head__id">
+              <h2 id="sd-overview-title" className="sd-overview-head__name">{d.name}</h2>
+              <p className="sd-overview-head__crumb">{d.sectorPath.join(' › ')}</p>
+            </div>
+          </div>
+          <div className="sd-overview-price">
+            <span className="sd-overview-price__amount">₹{d.price.toFixed(2)}</span>
+            <span className={`sd-overview-price__change sd-overview-price__change--${direction}`}>
+              {d.changePct > 0 ? '+' : ''}{d.changePct.toFixed(2)}%
+            </span>
+            <span className="sd-overview-price__meta">21 May · close price</span>
+          </div>
+          <div className="sd-overview-links">
+            <a href={`https://${d.website}`} target="_blank" rel="noreferrer noopener" className="sd-overview-link" onClick={(e) => e.stopPropagation()}>
+              {d.website}
+            </a>
+            <span className="sd-overview-chip">{d.exchange}: {d.ticker}</span>
+          </div>
 
-        <div className="fund-drawer__grid">
-          <div className="fund-stat"><span>Market cap</span><strong>{f.marketCap}</strong></div>
-          <div className="fund-stat"><span>P/E</span><strong>{f.pe.toFixed(1)}</strong></div>
-          <div className="fund-stat"><span>EPS</span><strong>${f.eps.toFixed(2)}</strong></div>
-          <div className="fund-stat"><span>Dividend</span><strong>{f.dividend}</strong></div>
-          <div className="fund-stat"><span>52w low</span><strong>${f.yearLow.toFixed(2)}</strong></div>
-          <div className="fund-stat"><span>52w high</span><strong>${f.yearHigh.toFixed(2)}</strong></div>
-        </div>
+          <div className="sd-overview-grid">
+            <div className="sd-stat"><span>Market Cap</span><strong>₹{formatCr(parseMarketCapToCr(d.marketCap))} Cr.</strong></div>
+            <div className="sd-stat"><span>Current Price</span><strong>₹{d.price.toFixed(2)}</strong></div>
+            <div className="sd-stat"><span>52w High / Low</span><strong>₹{d.high52w.toFixed(0)} / {d.low52w.toFixed(0)}</strong></div>
+            <div className="sd-stat"><span>Stock P/E</span><strong>{d.pe.toFixed(2)}</strong></div>
+            <div className="sd-stat"><span>Book Value</span><strong>₹{d.bookValue.toFixed(1)}</strong></div>
+            <div className="sd-stat"><span>Dividend Yield</span><strong>{d.divYieldPct.toFixed(2)} %</strong></div>
+            <div className="sd-stat"><span>ROCE</span><strong>{d.rocePct.toFixed(1)} %</strong></div>
+            <div className="sd-stat"><span>ROE</span><strong>{d.roePct.toFixed(1)} %</strong></div>
+            <div className="sd-stat"><span>Face Value</span><strong>₹{d.faceValue.toFixed(2)}</strong></div>
+          </div>
 
-        <div className="fund-drawer__highlights">
-          <p className="fund-drawer__highlights-label">Highlights</p>
-          <ul>{f.highlights.map((h, i) => <li key={i}>{h}</li>)}</ul>
-        </div>
+          <div className="sd-overview-about">
+            <h3 className="sd-section-label">About</h3>
+            <p>{d.about}</p>
+          </div>
+          {d.keyPoints.length > 0 && (
+            <div className="sd-overview-about">
+              <h3 className="sd-section-label">Key points</h3>
+              <ul className="sd-keypoints">
+                {d.keyPoints.map((k, i) => <li key={i}>{k}</li>)}
+              </ul>
+            </div>
+          )}
+        </section>
 
-        {f.related.length > 0 && (
-          <div className="fund-drawer__related">
-            <p className="fund-drawer__related-label">Related stocks</p>
-            <ul className="fund-drawer__related-list">
-              {f.related.map((sym) => {
+        <section
+          id="chart"
+          ref={(el) => { sectionRefs.current.chart = el }}
+          className="sd-section"
+          aria-labelledby="sd-chart-title"
+        >
+          <h3 id="sd-chart-title" className="sd-section-title">Chart</h3>
+          <StockPriceChart symbol={d.ticker} currentPrice={d.price} />
+        </section>
+
+        <section
+          id="analysis"
+          ref={(el) => { sectionRefs.current.analysis = el }}
+          className="sd-section"
+          aria-labelledby="sd-analysis-title"
+        >
+          <h3 id="sd-analysis-title" className="sd-section-title">Analysis</h3>
+          <div className="sd-analysis-grid">
+            <article className="sd-pc sd-pc--pros">
+              <h4 className="sd-pc__label">Pros</h4>
+              <ul>{d.pros.map((p, i) => <li key={i}>{p}</li>)}</ul>
+            </article>
+            <article className="sd-pc sd-pc--cons">
+              <h4 className="sd-pc__label">Cons</h4>
+              <ul>{d.cons.map((c, i) => <li key={i}>{c}</li>)}</ul>
+            </article>
+          </div>
+          <p className="sd-section-foot">* Pros and cons are derived from the latest quarterly financials.</p>
+        </section>
+
+        <section
+          id="peers"
+          ref={(el) => { sectionRefs.current.peers = el }}
+          className="sd-section"
+          aria-labelledby="sd-peers-title"
+        >
+          <h3 id="sd-peers-title" className="sd-section-title">Peer comparison</h3>
+          <p className="sd-section-sub">{d.sectorPath.join(' › ')}</p>
+          <div className="sd-table-wrap sd-table-wrap--sticky">
+            <table className="sd-table sd-table--peers">
+              <thead>
+                <tr>
+                  <th className="sd-th sd-th--label">Name</th>
+                  <th className="sd-th">CMP</th>
+                  <th className="sd-th">P/E</th>
+                  <th className="sd-th">M.Cap Cr.</th>
+                  <th className="sd-th">Div Yld %</th>
+                  <th className="sd-th">NP Qtr</th>
+                  <th className="sd-th">Profit Δ %</th>
+                  <th className="sd-th">Sales Qtr</th>
+                  <th className="sd-th">Sales Δ %</th>
+                  <th className="sd-th">ROCE %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.peers.map((p) => (
+                  <tr key={p.ticker} className={p.ticker === d.ticker ? 'sd-tr--self' : ''}>
+                    <th scope="row" className="sd-th sd-th--label sd-td-label">
+                      <button type="button" className="sd-peer-name" onClick={() => onOpenRelated(p.ticker)}>{p.name}</button>
+                    </th>
+                    <td className="sd-td">{p.cmp.toLocaleString('en-IN')}</td>
+                    <td className="sd-td">{p.pe.toFixed(2)}</td>
+                    <td className="sd-td">{p.marketCap.toLocaleString('en-IN')}</td>
+                    <td className="sd-td">{p.divYieldPct.toFixed(2)}</td>
+                    <td className="sd-td">{p.npQtr.toLocaleString('en-IN')}</td>
+                    <td className={`sd-td ${p.profitVarPct >= 0 ? 'sd-td--up' : 'sd-td--down'}`}>{p.profitVarPct.toFixed(2)}</td>
+                    <td className="sd-td">{p.salesQtr.toLocaleString('en-IN')}</td>
+                    <td className={`sd-td ${p.salesVarPct >= 0 ? 'sd-td--up' : 'sd-td--down'}`}>{p.salesVarPct.toFixed(2)}</td>
+                    <td className="sd-td">{p.rocePct.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          id="quarters"
+          ref={(el) => { sectionRefs.current.quarters = el }}
+          className="sd-section"
+          aria-labelledby="sd-quarters-title"
+        >
+          <h3 id="sd-quarters-title" className="sd-section-title">Quarterly Results</h3>
+          <p className="sd-section-sub">Consolidated figures in ₹ crores.</p>
+          <ScrollTable
+            headers={quartersHeaders}
+            rows={[
+              { label: 'Sales',           values: d.quarters.map((q) => q.sales) },
+              { label: 'Expenses',        values: d.quarters.map((q) => q.expenses) },
+              { label: 'Operating Profit', bold: true, values: d.quarters.map((q) => q.opProfit) },
+              { label: 'OPM %',           values: d.quarters.map((q) => `${q.opmPct}%`) },
+              { label: 'Other Income',    values: d.quarters.map((q) => q.otherInc) },
+              { label: 'Interest',        values: d.quarters.map((q) => q.interest) },
+              { label: 'Depreciation',    values: d.quarters.map((q) => q.depreciation) },
+              { label: 'Profit before tax', bold: true, values: d.quarters.map((q) => q.pbt) },
+              { label: 'Tax %',           values: d.quarters.map((q) => `${q.taxPct}%`) },
+              { label: 'Net Profit',  bold: true, values: d.quarters.map((q) => q.netProfit) },
+              { label: 'EPS in ₹',        values: d.quarters.map((q) => q.eps.toFixed(2)) },
+            ]}
+          />
+        </section>
+
+        <section
+          id="pnl"
+          ref={(el) => { sectionRefs.current.pnl = el }}
+          className="sd-section"
+          aria-labelledby="sd-pnl-title"
+        >
+          <h3 id="sd-pnl-title" className="sd-section-title">Profit &amp; Loss</h3>
+          <p className="sd-section-sub">Consolidated figures in ₹ crores.</p>
+          <ScrollTable
+            headers={pnlHeaders}
+            rows={[
+              { label: 'Sales',           values: d.pnl.map((q) => q.sales) },
+              { label: 'Expenses',        values: d.pnl.map((q) => q.expenses) },
+              { label: 'Operating Profit', bold: true, values: d.pnl.map((q) => q.opProfit) },
+              { label: 'OPM %',           values: d.pnl.map((q) => `${q.opmPct}%`) },
+              { label: 'Other Income',    values: d.pnl.map((q) => q.otherInc) },
+              { label: 'Interest',        values: d.pnl.map((q) => q.interest) },
+              { label: 'Depreciation',    values: d.pnl.map((q) => q.depreciation) },
+              { label: 'Profit before tax', bold: true, values: d.pnl.map((q) => q.pbt) },
+              { label: 'Tax %',           values: d.pnl.map((q) => `${q.taxPct}%`) },
+              { label: 'Net Profit',  bold: true, values: d.pnl.map((q) => q.netProfit) },
+              { label: 'EPS in ₹',        values: d.pnl.map((q) => q.eps.toFixed(2)) },
+            ]}
+          />
+        </section>
+
+        <section
+          id="balance"
+          ref={(el) => { sectionRefs.current.balance = el }}
+          className="sd-section"
+          aria-labelledby="sd-balance-title"
+        >
+          <h3 id="sd-balance-title" className="sd-section-title">Balance Sheet</h3>
+          <p className="sd-section-sub">Consolidated figures in ₹ crores.</p>
+          <ScrollTable
+            headers={balanceHeaders}
+            rows={[
+              { label: 'Equity Capital',  values: d.balance.map((b) => b.equity) },
+              { label: 'Reserves',        values: d.balance.map((b) => b.reserves) },
+              { label: 'Borrowings',      values: d.balance.map((b) => b.borrowings) },
+              { label: 'Other Liabilities', values: d.balance.map((b) => b.otherLiab) },
+              { label: 'Total Liabilities', bold: true, values: d.balance.map((b) => b.total) },
+              { label: 'Fixed Assets',    values: d.balance.map((b) => b.fixedAssets) },
+              { label: 'CWIP',            values: d.balance.map((b) => b.cwip) },
+              { label: 'Investments',     values: d.balance.map((b) => b.investments) },
+              { label: 'Other Assets',    values: d.balance.map((b) => b.otherAssets) },
+              { label: 'Total Assets',  bold: true, values: d.balance.map((b) => b.total) },
+            ]}
+          />
+        </section>
+
+        <section
+          id="cashflow"
+          ref={(el) => { sectionRefs.current.cashflow = el }}
+          className="sd-section"
+          aria-labelledby="sd-cashflow-title"
+        >
+          <h3 id="sd-cashflow-title" className="sd-section-title">Cash Flow</h3>
+          <p className="sd-section-sub">Consolidated figures in ₹ crores.</p>
+          <ScrollTable
+            headers={cashflowHeaders}
+            rows={[
+              { label: 'Operating Activity', values: d.cashflow.map((c) => c.operating) },
+              { label: 'Investing Activity', values: d.cashflow.map((c) => c.investing) },
+              { label: 'Financing Activity', values: d.cashflow.map((c) => c.financing) },
+              { label: 'Net Cash Flow', bold: true, values: d.cashflow.map((c) => c.net) },
+            ]}
+          />
+        </section>
+
+        <section
+          id="ratios"
+          ref={(el) => { sectionRefs.current.ratios = el }}
+          className="sd-section"
+          aria-labelledby="sd-ratios-title"
+        >
+          <h3 id="sd-ratios-title" className="sd-section-title">Ratios</h3>
+          <ScrollTable
+            headers={ratioHeaders}
+            rows={[
+              { label: 'Debtor Days',        values: d.ratios.map((r) => r.debtorDays) },
+              { label: 'Inventory Days',     values: d.ratios.map((r) => r.inventoryDays) },
+              { label: 'Cash Conv. Cycle',   values: d.ratios.map((r) => r.ccc) },
+              { label: 'ROE %',              values: d.ratios.map((r) => r.roePct.toFixed(1)) },
+              { label: 'ROCE %', bold: true, values: d.ratios.map((r) => r.rocePct.toFixed(1)) },
+            ]}
+          />
+        </section>
+
+        <section
+          id="investors"
+          ref={(el) => { sectionRefs.current.investors = el }}
+          className="sd-section"
+          aria-labelledby="sd-investors-title"
+        >
+          <h3 id="sd-investors-title" className="sd-section-title">Shareholding Pattern</h3>
+          <div className="sd-share-bar" role="img" aria-label="Current shareholding split">
+            <span className="sd-share-bar__seg sd-share-bar__seg--promoter" style={{ width: `${d.shareholding.latest.promoter}%` }}>Promoter {d.shareholding.latest.promoter}%</span>
+            <span className="sd-share-bar__seg sd-share-bar__seg--fii"     style={{ width: `${d.shareholding.latest.fii}%` }}>FII {d.shareholding.latest.fii}%</span>
+            <span className="sd-share-bar__seg sd-share-bar__seg--dii"     style={{ width: `${d.shareholding.latest.dii}%` }}>DII {d.shareholding.latest.dii}%</span>
+            <span className="sd-share-bar__seg sd-share-bar__seg--public"  style={{ width: `${d.shareholding.latest.public}%` }}>Public {d.shareholding.latest.public}%</span>
+          </div>
+          <div className="sd-table-wrap sd-table-wrap--sticky">
+            <table className="sd-table">
+              <thead>
+                <tr>
+                  <th className="sd-th sd-th--label" />
+                  {d.shareholding.history.map((h) => <th key={h.label} className="sd-th">{h.label}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row" className="sd-th sd-th--label sd-td-label">Promoters %</th>
+                  {d.shareholding.history.map((h) => <td key={h.label} className="sd-td">{h.snapshot.promoter}</td>)}
+                </tr>
+                <tr>
+                  <th scope="row" className="sd-th sd-th--label sd-td-label">FIIs %</th>
+                  {d.shareholding.history.map((h) => <td key={h.label} className="sd-td">{h.snapshot.fii}</td>)}
+                </tr>
+                <tr>
+                  <th scope="row" className="sd-th sd-th--label sd-td-label">DIIs %</th>
+                  {d.shareholding.history.map((h) => <td key={h.label} className="sd-td">{h.snapshot.dii}</td>)}
+                </tr>
+                <tr>
+                  <th scope="row" className="sd-th sd-th--label sd-td-label">Public %</th>
+                  {d.shareholding.history.map((h) => <td key={h.label} className="sd-td">{h.snapshot.public}</td>)}
+                </tr>
+                {d.shareholding.latest.gov > 0 && (
+                  <tr>
+                    <th scope="row" className="sd-th sd-th--label sd-td-label">Government %</th>
+                    {d.shareholding.history.map((h) => <td key={h.label} className="sd-td">{h.snapshot.gov}</td>)}
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          id="documents"
+          ref={(el) => { sectionRefs.current.documents = el }}
+          className="sd-section"
+          aria-labelledby="sd-documents-title"
+        >
+          <h3 id="sd-documents-title" className="sd-section-title">Documents</h3>
+          <ul className="sd-docs">
+            {d.documents.map((doc, i) => (
+              <li key={i} className="sd-doc">
+                <span className={`sd-doc__type sd-doc__type--${doc.type.replace(/\s+/g, '-').toLowerCase()}`}>{doc.type}</span>
+                <span className="sd-doc__title">{doc.title}</span>
+                <span className="sd-doc__date">{doc.date}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {d.related.length > 0 && (
+          <section className="sd-section sd-section--related">
+            <h3 className="sd-section-title">Related stocks</h3>
+            <ul className="sd-related">
+              {d.related.map((sym) => {
                 const r = getFundamentals(sym)
-                const direction: ImpactArrow = r.changePct > 0 ? 'up' : r.changePct < 0 ? 'down' : 'flat'
+                const rd: ImpactArrow = r.changePct > 0 ? 'up' : r.changePct < 0 ? 'down' : 'flat'
                 return (
                   <li key={sym}>
-                    <button
-                      type="button"
-                      className="fund-related"
-                      onClick={() => onOpenRelated(sym)}
-                    >
-                      <CompanyLogo ticker={r.ticker} initials={r.initials} bg={r.bg} size={28} />
-                      <span className="fund-related__id">
-                        <span className="fund-related__sym">{r.ticker}</span>
-                        <span className="fund-related__name">{r.name}</span>
+                    <button type="button" className="sd-related__btn" onClick={() => onOpenRelated(sym)}>
+                      <CompanyLogo ticker={r.ticker} initials={r.initials} bg={r.bg} size={32} />
+                      <span className="sd-related__id">
+                        <span className="sd-related__sym">${r.ticker}</span>
+                        <span className="sd-related__name">{r.name}</span>
                       </span>
-                      <span className={`fund-related__pct fund-related__pct--${direction}`}>
+                      <span className={`sd-related__pct sd-related__pct--${rd}`}>
                         {r.changePct > 0 ? '+' : ''}{r.changePct.toFixed(1)}%
                       </span>
                     </button>
@@ -5718,8 +6657,11 @@ function FundamentalsDrawer({ symbol, onClose, onOpenRelated }: { symbol: string
                 )
               })}
             </ul>
-          </div>
+          </section>
         )}
+
+        {/* Bottom spacer so last section can scroll above tab strip cleanly */}
+        <div className="sd-spacer" aria-hidden />
       </div>
     </div>,
     document.body,
@@ -5791,63 +6733,6 @@ function ExchangeSheet({
           {filtered.length === 0 && <li className="city-search-empty">No matching exchange</li>}
         </ul>
       </div>
-    </div>
-  )
-}
-
-function FinSearchBar({
-  value,
-  onChange,
-  onPick,
-}: {
-  value: string
-  onChange: (v: string) => void
-  onPick: (sym: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const results = useMemo(() => {
-    if (!value.trim()) return []
-    const q = value.toLowerCase()
-    return SEARCH_INSTRUMENTS.filter((i) =>
-      i.symbol.toLowerCase().includes(q) || i.name.toLowerCase().includes(q),
-    ).slice(0, 8)
-  }, [value])
-
-  return (
-    <div className="fin-search-wrap">
-      <span className="fin-search-icon" aria-hidden>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" />
-        </svg>
-      </span>
-      <input
-        className="fin-search"
-        type="search"
-        value={value}
-        placeholder="Search markets, tickers…"
-        onChange={(e) => { onChange(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 120)}
-        aria-label="Search financial instruments"
-      />
-      {open && results.length > 0 && (
-        <ul className="fin-search-results" role="listbox">
-          {results.map((r) => (
-            <li key={r.symbol}>
-              <button
-                type="button"
-                className="fin-search-item"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { onPick(r.symbol); onChange(''); setOpen(false) }}
-              >
-                <span className="fin-search-item__sym">{r.symbol}</span>
-                <span className="fin-search-item__name">{r.name}</span>
-                <span className={`fin-search-item__type fin-search-item__type--${r.type.toLowerCase()}`}>{r.type}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   )
 }
@@ -7428,14 +8313,838 @@ function FinanceFab({ onOpenGuide }: { onOpenGuide: () => void }) {
   )
 }
 
+/* ── Finance bottom tabs ─────────────────────────── */
+
+type FinTab = 'home' | 'list' | 'search' | 'props' | 'learn'
+
+function IconFinHome({ active }: { active?: boolean }) {
+  const w = active ? 2.3 : 2
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 19h18" />
+      <rect x="5"  y="11" width="3" height="6" rx="0.6" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.22 : 0} />
+      <rect x="10.5" y="7"  width="3" height="10" rx="0.6" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.22 : 0} />
+      <rect x="16" y="4"  width="3" height="13" rx="0.6" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.22 : 0} />
+    </svg>
+  )
+}
+
+function IconFinList({ active }: { active?: boolean }) {
+  const w = active ? 2.2 : 2
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="4" y="5" width="16" height="15" rx="2.5" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.16 : 0} />
+      <path d="M8 4v3M16 4v3" />
+      <path d="M8 11h5" strokeWidth={1.7} />
+      <path d="M8 15h8" strokeWidth={1.7} />
+    </svg>
+  )
+}
+
+function IconFinSearch({ active }: { active?: boolean }) {
+  const w = active ? 2.3 : 2
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="11" cy="11" r="7" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.16 : 0} />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  )
+}
+
+function IconFinProps({ active }: { active?: boolean }) {
+  const w = active ? 2.2 : 2
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M5 7h7" />
+      <path d="M16 7h3" />
+      <circle cx="14" cy="7" r="2.4" fill={active ? 'currentColor' : 'var(--bg, #fff)'} fillOpacity={active ? 0.3 : 1} />
+      <path d="M5 17h3" />
+      <path d="M12 17h7" />
+      <circle cx="10" cy="17" r="2.4" fill={active ? 'currentColor' : 'var(--bg, #fff)'} fillOpacity={active ? 0.3 : 1} />
+    </svg>
+  )
+}
+
+function IconFinLearn({ active }: { active?: boolean }) {
+  const w = active ? 2.2 : 2
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 9 12 4l9 5-9 5-9-5Z" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.18 : 0} />
+      <path d="M7 11.5V16c2 1.5 8 1.5 10 0v-4.5" />
+      <path d="M21 9v5" strokeWidth={1.7} />
+    </svg>
+  )
+}
+
+function FinanceTabbar({ active, onChange }: { active: FinTab; onChange: (t: FinTab) => void }) {
+  const tabs: { id: FinTab; label: string; Icon: (p: { active?: boolean }) => React.ReactElement }[] = [
+    { id: 'home',   label: 'Home',   Icon: IconFinHome },
+    { id: 'list',   label: 'Lists',  Icon: IconFinList },
+    { id: 'search', label: 'Search', Icon: IconFinSearch },
+    { id: 'props',  label: 'Props',  Icon: IconFinProps },
+    { id: 'learn',  label: 'Learn',  Icon: IconFinLearn },
+  ]
+  return (
+    <nav className="fin-tabbar" aria-label="Finance navigation">
+      {tabs.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          className={`fin-tab${active === id ? ' fin-tab--active' : ''}`}
+          aria-current={active === id ? 'page' : undefined}
+          onClick={() => onChange(id)}
+        >
+          <Icon active={active === id} />
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+/* ── Watchlists screen ───────────────────────────── */
+
+type Watchlist = { id: string; name: string; tickers: string[] }
+
+const WL_STORAGE_KEY = 'nm_fin_watchlists'
+
+function loadWatchlists(): Watchlist[] {
+  try {
+    const raw = localStorage.getItem(WL_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as Watchlist[]
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch { /* ignore */ }
+  return [{ id: 'default', name: 'My watchlist', tickers: ['AAPL', 'NVDA', 'TSLA'] }]
+}
+
+function WatchlistsScreen() {
+  const openTicker = useFund()
+  const [lists, setLists] = useState<Watchlist[]>(loadWatchlists)
+  const [activeId, setActiveId] = useState<string>(() => lists[0]?.id ?? 'default')
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
+  const [addQuery, setAddQuery] = useState('')
+
+  const persist = useCallback((next: Watchlist[]) => {
+    setLists(next)
+    try { localStorage.setItem(WL_STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+  }, [])
+
+  const active = lists.find((l) => l.id === activeId) ?? lists[0] ?? null
+
+  const createList = (name: string) => {
+    const n = name.trim()
+    if (!n) return
+    const list: Watchlist = { id: `wl-${Date.now()}`, name: n, tickers: [] }
+    persist([...lists, list])
+    setActiveId(list.id)
+    setCreating(false)
+    setNewName('')
+  }
+
+  const removeList = (id: string) => {
+    const next = lists.filter((l) => l.id !== id)
+    if (next.length === 0) {
+      persist([{ id: 'default', name: 'My watchlist', tickers: [] }])
+      setActiveId('default')
+      return
+    }
+    persist(next)
+    if (activeId === id) setActiveId(next[0].id)
+  }
+
+  const removeTicker = (sym: string) => {
+    if (!active) return
+    persist(lists.map((l) => l.id === active.id ? { ...l, tickers: l.tickers.filter((t) => t !== sym) } : l))
+  }
+
+  const addTicker = (sym: string) => {
+    if (!active) return
+    if (active.tickers.includes(sym)) return
+    persist(lists.map((l) => l.id === active.id ? { ...l, tickers: [...l.tickers, sym] } : l))
+  }
+
+  const searchResults = useMemo(() => {
+    const q = addQuery.trim().toLowerCase()
+    if (!q) return SEARCH_INSTRUMENTS.slice(0, 10)
+    return SEARCH_INSTRUMENTS.filter((i) =>
+      i.symbol.toLowerCase().includes(q) || i.name.toLowerCase().includes(q),
+    ).slice(0, 16)
+  }, [addQuery])
+
+  return (
+    <section className="fin-screen-page">
+      <header className="fin-screen-page__head">
+        <h2 className="fin-screen-page__title">Watchlists</h2>
+        <p className="fin-screen-page__sub">Track favorite tickers across as many lists as you like.</p>
+      </header>
+
+      <div className="watchlist-tabs" role="tablist" aria-label="Watchlists">
+        {lists.map((l) => (
+          <button
+            key={l.id}
+            type="button"
+            role="tab"
+            aria-selected={active?.id === l.id}
+            className={`watchlist-tab${active?.id === l.id ? ' watchlist-tab--active' : ''}`}
+            onClick={() => setActiveId(l.id)}
+          >
+            <span>{l.name}</span>
+            <span className="watchlist-tab__count">{l.tickers.length}</span>
+          </button>
+        ))}
+        <button
+          type="button"
+          className="watchlist-tab watchlist-tab--new"
+          onClick={() => setCreating(true)}
+          aria-label="Create new list"
+        >+ New list</button>
+      </div>
+
+      {creating && (
+        <div className="watchlist-create">
+          <input
+            type="text"
+            autoFocus
+            value={newName}
+            placeholder="e.g. Tech bets"
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') createList(newName)
+              if (e.key === 'Escape') { setCreating(false); setNewName('') }
+            }}
+            className="watchlist-create__input"
+          />
+          <button type="button" className="watchlist-create__btn" onClick={() => createList(newName)}>Create</button>
+          <button type="button" className="watchlist-create__btn watchlist-create__btn--ghost" onClick={() => { setCreating(false); setNewName('') }}>Cancel</button>
+        </div>
+      )}
+
+      {active && (
+        <div className="watchlist-body">
+          <div className="watchlist-body__head">
+            <h3 className="watchlist-body__name">{active.name}</h3>
+            <div className="watchlist-body__actions">
+              <button type="button" className="watchlist-add-btn" onClick={() => setAddOpen(true)}>+ Add ticker</button>
+              {lists.length > 1 && (
+                <button type="button" className="watchlist-del-btn" onClick={() => removeList(active.id)}>Delete list</button>
+              )}
+            </div>
+          </div>
+
+          {active.tickers.length === 0 ? (
+            <div className="watchlist-empty">
+              <p>No tickers in this list yet.</p>
+              <p>Tap <strong>+ Add ticker</strong> to find one.</p>
+            </div>
+          ) : (
+            <ul className="watchlist-items">
+              {active.tickers.map((sym) => {
+                const f = getFundamentals(sym)
+                const direction: ImpactArrow = f.changePct > 0 ? 'up' : f.changePct < 0 ? 'down' : 'flat'
+                return (
+                  <li key={sym} className={`watchlist-item watchlist-item--${direction}`}>
+                    <button type="button" className="watchlist-item__main" onClick={() => openTicker?.(sym)}>
+                      <CompanyLogo ticker={f.ticker} initials={f.initials} bg={f.bg} size={38} />
+                      <span className="watchlist-item__id">
+                        <span className="watchlist-item__sym">${f.ticker}</span>
+                        <span className="watchlist-item__name">{f.name}</span>
+                      </span>
+                      <ImpactSparkline series={f.series} direction={direction} height={28} />
+                      <span className="watchlist-item__meta">
+                        <span className="watchlist-item__price">${f.price.toFixed(2)}</span>
+                        <span className={`watchlist-item__delta watchlist-item__delta--${direction}`}>
+                          {f.changePct > 0 ? '+' : ''}{f.changePct.toFixed(2)}%
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="watchlist-item__rm"
+                      aria-label={`Remove ${sym}`}
+                      onClick={() => removeTicker(sym)}
+                    >×</button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {addOpen && active && (
+        <div className="watchlist-add-sheet" role="dialog" aria-modal="true" aria-label={`Add ticker to ${active.name}`}>
+          <div className="watchlist-add-sheet__head">
+            <h4>Add to "{active.name}"</h4>
+            <button type="button" className="watchlist-add-sheet__close" aria-label="Close" onClick={() => { setAddOpen(false); setAddQuery('') }}>×</button>
+          </div>
+          <input
+            autoFocus
+            type="search"
+            value={addQuery}
+            placeholder="Search ticker or company…"
+            onChange={(e) => setAddQuery(e.target.value)}
+            className="watchlist-add-sheet__input"
+          />
+          <ul className="watchlist-add-sheet__results">
+            {searchResults.map((r) => {
+              const inList = active.tickers.includes(r.symbol)
+              return (
+                <li key={r.symbol}>
+                  <button
+                    type="button"
+                    disabled={inList}
+                    className={`watchlist-add-sheet__row${inList ? ' watchlist-add-sheet__row--in' : ''}`}
+                    onClick={() => { addTicker(r.symbol); setAddOpen(false); setAddQuery('') }}
+                  >
+                    <span className="watchlist-add-sheet__sym">{r.symbol}</span>
+                    <span className="watchlist-add-sheet__name">{r.name}</span>
+                    <span className="watchlist-add-sheet__type">{r.type}</span>
+                    {inList && <span className="watchlist-add-sheet__check" aria-hidden>✓</span>}
+                  </button>
+                </li>
+              )
+            })}
+            {searchResults.length === 0 && <li className="fin-search-page__empty">No matches</li>}
+          </ul>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/* ── Search screen ───────────────────────────────── */
+
+const RECENT_SEARCH_KEY = 'nm_fin_recent_searches'
+const FREQUENT_SEARCH_TICKERS = ['AAPL', 'NVDA', 'TSLA', 'AMZN', 'MSFT', 'META', 'GOOGL', 'COIN', 'PLTR']
+
+function loadRecentSearches(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCH_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as string[]
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch { /* ignore */ }
+  return []
+}
+
+function FinSearchScreen() {
+  const open = useFund()
+  const [q, setQ] = useState('')
+  const [recents, setRecents] = useState<string[]>(loadRecentSearches)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  const record = useCallback((sym: string) => {
+    setRecents((prev) => {
+      const next = [sym, ...prev.filter((s) => s !== sym)].slice(0, 10)
+      try { localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
+  }, [])
+
+  const clearRecents = () => {
+    setRecents([])
+    try { localStorage.removeItem(RECENT_SEARCH_KEY) } catch { /* ignore */ }
+  }
+
+  const results = useMemo(() => {
+    const query = q.trim().toLowerCase()
+    if (!query) return []
+    return SEARCH_INSTRUMENTS.filter((i) =>
+      i.symbol.toLowerCase().includes(query) || i.name.toLowerCase().includes(query),
+    ).slice(0, 24)
+  }, [q])
+
+  const onPick = (sym: string) => {
+    record(sym)
+    open?.(sym)
+  }
+
+  return (
+    <section className="fin-screen-page fin-search-page">
+      <div className="fin-search-page__input-wrap">
+        <span className="fin-search-page__icon" aria-hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" />
+          </svg>
+        </span>
+        <input
+          ref={inputRef}
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="fin-search-page__input"
+          placeholder="Search tickers, indices, ETFs…"
+          aria-label="Search financial instruments"
+          enterKeyHint="search"
+        />
+        {q && (
+          <button
+            type="button"
+            className="fin-search-page__clear"
+            onClick={() => { setQ(''); inputRef.current?.focus() }}
+            aria-label="Clear"
+          >×</button>
+        )}
+      </div>
+
+      {q.trim() ? (
+        <ul className="fin-search-page__results">
+          {results.length === 0 ? (
+            <li className="fin-search-page__empty">No matches</li>
+          ) : results.map((r) => (
+            <li key={r.symbol}>
+              <button type="button" className="fin-search-page__row" onClick={() => onPick(r.symbol)}>
+                <span className="fin-search-page__row-sym">{r.symbol}</span>
+                <span className="fin-search-page__row-name">{r.name}</span>
+                <span className={`fin-search-page__row-type fin-search-page__row-type--${r.type.toLowerCase()}`}>{r.type}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <>
+          {recents.length > 0 && (
+            <section className="fin-search-section">
+              <div className="fin-search-section__head">
+                <h3>Recent</h3>
+                <button type="button" className="fin-search-section__clear" onClick={clearRecents}>Clear</button>
+              </div>
+              <ul className="fin-search-page__recents">
+                {recents.map((sym) => (
+                  <li key={sym}>
+                    <button type="button" className="fin-search-page__pill" onClick={() => onPick(sym)}>
+                      <span className="fin-search-page__pill-sym">${sym}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section className="fin-search-section">
+            <div className="fin-search-section__head">
+              <h3>Frequently searched</h3>
+            </div>
+            <div className="fin-search-page__grid">
+              {FREQUENT_SEARCH_TICKERS.map((sym) => {
+                const f = getFundamentals(sym)
+                const direction: ImpactArrow = f.changePct > 0 ? 'up' : f.changePct < 0 ? 'down' : 'flat'
+                return (
+                  <button
+                    key={sym}
+                    type="button"
+                    className={`fin-search-page__tile fin-search-page__tile--${direction}`}
+                    onClick={() => onPick(sym)}
+                  >
+                    <CompanyLogo ticker={f.ticker} initials={f.initials} bg={f.bg} size={32} />
+                    <span className="fin-search-page__tile-sym">{f.ticker}</span>
+                    <span className="fin-search-page__tile-name">{f.name}</span>
+                    <span className={`fin-search-page__tile-delta fin-search-page__tile-delta--${direction}`}>
+                      {f.changePct > 0 ? '+' : ''}{f.changePct.toFixed(1)}%
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        </>
+      )}
+    </section>
+  )
+}
+
+/* ── Props (tools) screen ────────────────────────── */
+
+type FinToolRule = 'goldenCross' | 'rsiOversold' | 'macdBullish' | 'darvas' | 'bearishCross' | 'volumeSurge' | 'magicFormula' | 'piotroski'
+
+type FinTool = {
+  id: string
+  name: string
+  category: 'Trend' | 'Momentum' | 'Volume' | 'Quality'
+  description: string
+  rule: FinToolRule
+}
+
+const FIN_TOOLS: FinTool[] = [
+  { id: 'golden',    name: 'Golden Crossover',    category: 'Trend',    description: '50-day moving average crosses above the 200-day from below.', rule: 'goldenCross' },
+  { id: 'rsi',       name: 'RSI · Oversold',      category: 'Momentum', description: 'Relative strength below 30 — often due for a technical bounce.', rule: 'rsiOversold' },
+  { id: 'macd',      name: 'MACD · Bullish',      category: 'Momentum', description: 'MACD line crosses above its signal line — momentum is shifting up.', rule: 'macdBullish' },
+  { id: 'darvas',    name: 'Darvas Scan',         category: 'Trend',    description: 'Within 10% of the 52-week high on rising volume.', rule: 'darvas' },
+  { id: 'bearish',   name: 'Bearish Crossovers',  category: 'Trend',    description: '50-day MA cuts the 200-day MA from above.', rule: 'bearishCross' },
+  { id: 'volume',    name: 'Price · Volume Action', category: 'Volume', description: 'Weekly volume up more than 5× with positive price action.', rule: 'volumeSurge' },
+  { id: 'magic',     name: 'Magic Formula',       category: 'Quality',  description: 'Greenblatt: combines earnings yield and return on capital.', rule: 'magicFormula' },
+  { id: 'piotroski', name: 'Piotroski Scan',      category: 'Quality',  description: 'F-Score of 9 across profitability, leverage, and operations.', rule: 'piotroski' },
+]
+
+const TOOL_CATEGORY_COLOR: Record<FinTool['category'], string> = {
+  Trend:    '#0369a1',
+  Momentum: '#f59e0b',
+  Volume:   '#6366f1',
+  Quality:  '#0d9488',
+}
+
+function applyTool(rule: FinToolRule, pool: MoverRow[]): MoverRow[] {
+  switch (rule) {
+    case 'goldenCross':
+    case 'macdBullish':
+    case 'volumeSurge':
+      return [...pool].filter((s) => s.changePct > 0).sort((a, b) => b.changePct - a.changePct).slice(0, 8)
+    case 'bearishCross':
+      return [...pool].filter((s) => s.changePct < 0).sort((a, b) => a.changePct - b.changePct).slice(0, 8)
+    case 'rsiOversold':
+      return [...pool].sort((a, b) => a.changePct - b.changePct).slice(0, 8)
+    case 'darvas':
+      return [...pool].sort((a, b) => b.changePct - a.changePct).slice(0, 6)
+    case 'magicFormula':
+    case 'piotroski':
+      return [...pool].sort((a, b) => {
+        const af = getFundamentals(a.ticker)
+        const bf = getFundamentals(b.ticker)
+        const ay = af.eps / Math.max(af.pe, 1)
+        const by = bf.eps / Math.max(bf.pe, 1)
+        return by - ay
+      }).slice(0, 8)
+  }
+}
+
+function FinFilterBar({ value, onChange, placeholder, ariaLabel }: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  ariaLabel: string
+}) {
+  return (
+    <div className="fin-filter-bar">
+      <span className="fin-filter-bar__icon" aria-hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" />
+        </svg>
+      </span>
+      <input
+        type="search"
+        className="fin-filter-bar__input"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={ariaLabel}
+        enterKeyHint="search"
+      />
+      {value && (
+        <button
+          type="button"
+          className="fin-filter-bar__clear"
+          onClick={() => onChange('')}
+          aria-label="Clear filter"
+        >×</button>
+      )}
+    </div>
+  )
+}
+
+function PropsScreen() {
+  const open = useFund()
+  const pool = useMemo(buildMoverPool, [])
+  const [activeTool, setActiveTool] = useState<FinTool | null>(null)
+  const [q, setQ] = useState('')
+
+  const visibleTools = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    if (!needle) return FIN_TOOLS
+    return FIN_TOOLS.filter((t) =>
+      t.name.toLowerCase().includes(needle) ||
+      t.category.toLowerCase().includes(needle) ||
+      t.description.toLowerCase().includes(needle),
+    )
+  }, [q])
+
+  useEffect(() => {
+    if (!activeTool) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setActiveTool(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [activeTool])
+
+  const matches = activeTool ? applyTool(activeTool.rule, pool) : []
+
+  return (
+    <section className="fin-screen-page">
+      <header className="fin-screen-page__head">
+        <h2 className="fin-screen-page__title">Props</h2>
+        <p className="fin-screen-page__sub">Apply screening tools and see the companies that match right now.</p>
+      </header>
+
+      <FinFilterBar
+        value={q}
+        onChange={setQ}
+        placeholder="Filter tools — golden cross, RSI, magic formula…"
+        ariaLabel="Filter screening tools"
+      />
+
+      {visibleTools.length === 0 ? (
+        <div className="fin-filter-empty">
+          No tools match <strong>"{q}"</strong>.
+        </div>
+      ) : (
+      <ul className="props-grid">
+        {visibleTools.map((t) => (
+          <li key={t.id}>
+            <button
+              type="button"
+              className="prop-card"
+              onClick={() => setActiveTool(t)}
+              style={{ ['--prop-accent' as never]: TOOL_CATEGORY_COLOR[t.category] }}
+            >
+              <span className="prop-card__cat">{t.category}</span>
+              <h4 className="prop-card__name">{t.name}</h4>
+              <p className="prop-card__desc">{t.description}</p>
+              <span className="prop-card__arrow" aria-hidden>→</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      )}
+
+      {activeTool && createPortal(
+        <div className="prop-sheet" role="dialog" aria-modal="true" aria-label={`Matches for ${activeTool.name}`}>
+          <div className="prop-sheet__head">
+            <div className="prop-sheet__head-text">
+              <span className="prop-sheet__cat" style={{ color: TOOL_CATEGORY_COLOR[activeTool.category] }}>{activeTool.category}</span>
+              <h3 className="prop-sheet__name">{activeTool.name}</h3>
+              <p className="prop-sheet__desc">{activeTool.description}</p>
+              <p className="prop-sheet__count">{matches.length} matches</p>
+            </div>
+            <button type="button" className="prop-sheet__close" aria-label="Close" onClick={() => setActiveTool(null)}>×</button>
+          </div>
+          <ul className="prop-sheet__results">
+            {matches.map((m) => {
+              const direction: ImpactArrow = m.changePct > 0 ? 'up' : m.changePct < 0 ? 'down' : 'flat'
+              return (
+                <li key={m.ticker} className={`prop-result prop-result--${direction}`}>
+                  <button
+                    type="button"
+                    className="prop-result__btn"
+                    onClick={() => { open?.(m.ticker); setActiveTool(null) }}
+                  >
+                    <CompanyLogo ticker={m.ticker} initials={m.initials} bg={m.bg} size={36} />
+                    <span className="prop-result__id">
+                      <span className="prop-result__sym">${m.ticker}</span>
+                      <span className="prop-result__name">{m.name}</span>
+                    </span>
+                    <ImpactSparkline series={m.series} direction={direction} height={26} />
+                    <span className={`prop-result__delta prop-result__delta--${direction}`}>
+                      {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}%
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>,
+        document.body,
+      )}
+    </section>
+  )
+}
+
+/* ── Learn screen ────────────────────────────────── */
+
+type LearnRoadmap = {
+  id: string
+  title: string
+  level: 'Beginner' | 'Intermediate' | 'Advanced' | 'Specialist'
+  hours: number
+  summary: string
+  accent: string
+  courses: { id: string; title: string; minutes: number; lessons: number }[]
+}
+
+const LEARN_ROADMAPS: LearnRoadmap[] = [
+  {
+    id: 'foundations',
+    title: 'Investing foundations',
+    level: 'Beginner',
+    hours: 6,
+    summary: 'Build the mental model behind stocks, indices, and how exchanges actually work.',
+    accent: '#0369a1',
+    courses: [
+      { id: 'f1', title: 'What is a stock, really?',   minutes: 18, lessons: 4 },
+      { id: 'f2', title: 'How prices get set',         minutes: 22, lessons: 5 },
+      { id: 'f3', title: 'Reading a ticker',           minutes: 14, lessons: 3 },
+      { id: 'f4', title: 'Indices, ETFs, and funds',   minutes: 32, lessons: 6 },
+    ],
+  },
+  {
+    id: 'value',
+    title: 'Value investing',
+    level: 'Intermediate',
+    hours: 9,
+    summary: 'From Graham’s margin of safety to modern quality compounding.',
+    accent: '#0d9488',
+    courses: [
+      { id: 'v1', title: 'Margin of safety',           minutes: 26, lessons: 5 },
+      { id: 'v2', title: 'Reading a 10-K without dying', minutes: 38, lessons: 7 },
+      { id: 'v3', title: 'DCF without lying to yourself', minutes: 44, lessons: 8 },
+      { id: 'v4', title: 'Moats and quality businesses', minutes: 30, lessons: 6 },
+    ],
+  },
+  {
+    id: 'technical',
+    title: 'Technical analysis',
+    level: 'Intermediate',
+    hours: 7,
+    summary: 'Chart patterns, indicators, and how traders read the tape.',
+    accent: '#f59e0b',
+    courses: [
+      { id: 't1', title: 'Candlestick basics',          minutes: 20, lessons: 4 },
+      { id: 't2', title: 'Moving averages and crossovers', minutes: 24, lessons: 5 },
+      { id: 't3', title: 'RSI, MACD, and momentum',     minutes: 28, lessons: 6 },
+      { id: 't4', title: 'Support, resistance, breakouts', minutes: 32, lessons: 6 },
+    ],
+  },
+  {
+    id: 'macro',
+    title: 'Macro and rates',
+    level: 'Advanced',
+    hours: 8,
+    summary: 'How central bank policy, inflation, and currencies bend markets.',
+    accent: '#6366f1',
+    courses: [
+      { id: 'm1', title: 'The yield curve, decoded',    minutes: 30, lessons: 5 },
+      { id: 'm2', title: 'Why rate cuts move equities', minutes: 26, lessons: 5 },
+      { id: 'm3', title: 'FX 101 for stock investors',  minutes: 22, lessons: 4 },
+      { id: 'm4', title: 'Reading the Fed',             minutes: 38, lessons: 7 },
+    ],
+  },
+  {
+    id: 'crypto',
+    title: 'Crypto and digital assets',
+    level: 'Specialist',
+    hours: 5,
+    summary: 'Wallets, on-chain primitives, and how crypto interacts with traditional markets.',
+    accent: '#dc2626',
+    courses: [
+      { id: 'c1', title: 'Wallets and custody',         minutes: 16, lessons: 4 },
+      { id: 'c2', title: 'L1s, L2s, and rollups',       minutes: 28, lessons: 6 },
+      { id: 'c3', title: 'Stablecoins and yield',       minutes: 22, lessons: 5 },
+      { id: 'c4', title: 'Spot ETFs and on-chain flows',minutes: 24, lessons: 5 },
+    ],
+  },
+]
+
+function LearnScreen() {
+  const [activeId, setActiveId] = useState<string>(LEARN_ROADMAPS[0].id)
+  const [q, setQ] = useState('')
+  const needle = q.trim().toLowerCase()
+
+  const visibleRoadmaps = useMemo(() => {
+    if (!needle) return LEARN_ROADMAPS
+    return LEARN_ROADMAPS.filter((r) =>
+      r.title.toLowerCase().includes(needle) ||
+      r.level.toLowerCase().includes(needle) ||
+      r.summary.toLowerCase().includes(needle) ||
+      r.courses.some((c) => c.title.toLowerCase().includes(needle)),
+    )
+  }, [needle])
+
+  useEffect(() => {
+    if (visibleRoadmaps.length === 0) return
+    if (!visibleRoadmaps.some((r) => r.id === activeId)) {
+      setActiveId(visibleRoadmaps[0].id)
+    }
+  }, [visibleRoadmaps, activeId])
+
+  const active = visibleRoadmaps.find((r) => r.id === activeId) ?? visibleRoadmaps[0] ?? null
+  const visibleCourses = needle && active
+    ? active.courses.filter((c) => c.title.toLowerCase().includes(needle) || active.title.toLowerCase().includes(needle))
+    : active?.courses ?? []
+
+  return (
+    <section className="fin-screen-page">
+      <header className="fin-screen-page__head">
+        <h2 className="fin-screen-page__title">Learn</h2>
+        <p className="fin-screen-page__sub">Pick a roadmap, follow the lessons. Hands-on courses with worked examples.</p>
+      </header>
+
+      <FinFilterBar
+        value={q}
+        onChange={setQ}
+        placeholder="Search roadmaps and courses…"
+        ariaLabel="Search learn content"
+      />
+
+      {visibleRoadmaps.length === 0 ? (
+        <div className="fin-filter-empty">
+          Nothing in Learn matches <strong>"{q}"</strong>.
+        </div>
+      ) : (
+        <>
+          <ul className="learn-roadmaps">
+            {visibleRoadmaps.map((r) => (
+              <li key={r.id}>
+                <button
+                  type="button"
+                  className={`learn-roadmap${activeId === r.id ? ' learn-roadmap--active' : ''}`}
+                  onClick={() => setActiveId(r.id)}
+                  style={{ ['--learn-accent' as never]: r.accent }}
+                >
+                  <span className="learn-roadmap__level">{r.level}</span>
+                  <h4 className="learn-roadmap__title">{r.title}</h4>
+                  <p className="learn-roadmap__summary">{r.summary}</p>
+                  <p className="learn-roadmap__meta">{r.hours}h · {r.courses.length} courses</p>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {active && (
+            <div
+              className="learn-courses"
+              style={{ ['--learn-accent' as never]: active.accent }}
+            >
+              <div className="learn-courses__head">
+                <span className="learn-courses__eyebrow">Roadmap</span>
+                <h3 className="learn-courses__title">{active.title}</h3>
+              </div>
+              <ol className="learn-courses__list">
+                {visibleCourses.map((c, i) => (
+                  <li key={c.id} className="learn-course">
+                    <span className="learn-course__num">{String(i + 1).padStart(2, '0')}</span>
+                    <div className="learn-course__body">
+                      <h4 className="learn-course__title">{c.title}</h4>
+                      <p className="learn-course__meta">{c.lessons} lessons · {c.minutes} min</p>
+                    </div>
+                    <button type="button" className="learn-course__btn" aria-label={`Start ${c.title}`}>Start</button>
+                  </li>
+                ))}
+                {visibleCourses.length === 0 && (
+                  <li className="learn-course learn-course--empty">No matching lessons in this roadmap.</li>
+                )}
+              </ol>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
 function FinanceScreen() {
+  const [finTab, setFinTab] = useState<FinTab>('home')
   const [exchange, setExchange] = useState<FinExchange>(FIN_EXCHANGES[0])
   const [showExchangeSheet, setShowExchangeSheet] = useState(false)
   const [drawerSym, setDrawerSym] = useState<string | null>(null)
   const [activeArticle, setActiveArticle] = useState<StockArticle | null>(null)
   const [activeTip, setActiveTip] = useState<ProTip | null>(null)
   const [showGuide, setShowGuide] = useState(false)
-  const [search, setSearch] = useState('')
   const [showNewsImages, setShowNewsImages] = useState(true)
 
   const openTicker = useCallback((s: string) => setDrawerSym(s), [])
@@ -7457,49 +9166,71 @@ function FinanceScreen() {
     <FundCtx.Provider value={openTicker}>
     <NewsImagesCtx.Provider value={{ show: showNewsImages, setShow: setShowNewsImages }}>
       <section className="finance-screen" aria-label="Finance">
-        <div className="finance-toolbar">
-          <button
-            type="button"
-            className="finance-exchange-pill"
-            onClick={() => setShowExchangeSheet(true)}
-            aria-label={`Exchange: ${exchange.name}. Tap to change.`}
-          >
-            <span className="finance-exchange-pill__short">{exchange.short}</span>
-            <span className="finance-exchange-pill__name">{exchange.name}</span>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-          <FinSearchBar value={search} onChange={setSearch} onPick={openTicker} />
-        </div>
+        {finTab === 'home' && (
+          <>
+            <div className="finance-toolbar">
+              <button
+                type="button"
+                className="finance-exchange-pill"
+                onClick={() => setShowExchangeSheet(true)}
+                aria-label={`Exchange: ${exchange.name}. Tap to change.`}
+              >
+                <span className="finance-exchange-pill__short">{exchange.short}</span>
+                <span className="finance-exchange-pill__name">{exchange.name}</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="fin-search-trigger"
+                onClick={() => setFinTab('search')}
+                aria-label="Open search"
+              >
+                <span className="fin-search-trigger__icon" aria-hidden>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" />
+                  </svg>
+                </span>
+                <span className="fin-search-trigger__text">Search markets, tickers…</span>
+              </button>
+            </div>
 
-        <MarketMovers />
-        <EconomicPulse />
-        <SectorHealth />
-        <IndustryMovers />
-        <NewsConnections />
-        <ReturnEstimator />
-        <ProTips />
+            <MarketMovers />
+            <EconomicPulse />
+            <SectorHealth />
+            <IndustryMovers />
+            <NewsConnections />
+            <ReturnEstimator />
+            <ProTips />
 
-        <div className="finance-settings">
-          <div className="finance-settings__head">
-            <h3>Display settings</h3>
-          </div>
-          <div className="fin-switch-row">
-            <span className="fin-switch__label">Show news thumbnails</span>
-            <button
-              type="button"
-              className={`fin-switch${showNewsImages ? ' fin-switch--on' : ''}`}
-              onClick={() => setShowNewsImages(!showNewsImages)}
-              aria-pressed={showNewsImages}
-            >
-              <span className="fin-switch__slider" />
-            </button>
-          </div>
-        </div>
+            <div className="finance-settings">
+              <div className="finance-settings__head">
+                <h3>Display settings</h3>
+              </div>
+              <div className="fin-switch-row">
+                <span className="fin-switch__label">Show news thumbnails</span>
+                <button
+                  type="button"
+                  className={`fin-switch${showNewsImages ? ' fin-switch--on' : ''}`}
+                  onClick={() => setShowNewsImages(!showNewsImages)}
+                  aria-pressed={showNewsImages}
+                >
+                  <span className="fin-switch__slider" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {finTab === 'list'   && <WatchlistsScreen />}
+        {finTab === 'search' && <FinSearchScreen />}
+        {finTab === 'props'  && <PropsScreen />}
+        {finTab === 'learn'  && <LearnScreen />}
       </section>
 
-      <FinanceFab onOpenGuide={() => setShowGuide(true)} />
+      {finTab === 'home' && <FinanceFab onOpenGuide={() => setShowGuide(true)} />}
+      <FinanceTabbar active={finTab} onChange={setFinTab} />
 
       {showExchangeSheet && (
         <ExchangeSheet
@@ -7508,7 +9239,7 @@ function FinanceScreen() {
           onClose={() => setShowExchangeSheet(false)}
         />
       )}
-      <FundamentalsDrawer symbol={drawerSym} onClose={() => setDrawerSym(null)} onOpenRelated={(sym) => setDrawerSym(sym)} />
+      <StockDetailScreen symbol={drawerSym} onClose={() => setDrawerSym(null)} onOpenRelated={(sym) => setDrawerSym(sym)} />
     </NewsImagesCtx.Provider>
     </FundCtx.Provider>
     <ArticleDetailScreen article={activeArticle} onClose={() => setActiveArticle(null)} />
