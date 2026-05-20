@@ -1,73 +1,32 @@
-# React + TypeScript + Vite
+# Newsmuncher
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A mobile-first news and finance reading experience built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+**Live demo:** https://meera19b.github.io/Newsmuncher/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Highlights
 
-## React Compiler
+- Home, For You, Categories, Insights, and Profile tabs with theming and brand variants
+- Finance section with its own 5-tab navigation (Home, Lists, Search, Props, Learn)
+- Fullscreen stock detail screen with sticky section tabs, scroll-synced active state, and horizontally scrollable financial tables (Overview, Chart, Analysis, Peers, Quarters, P&L, Balance, Cash Flow, Ratios, Investors, Documents)
+- Interactive stock price chart with 1D / 1W / 1M / 6M / YTD / 1Y / 5Y timeframes and hover crosshair
+- Watchlists, instrument search with recents, screening tools (RSI, MACD, Magic Formula, Piotroski, etc.), and a Learn tab with curated roadmaps
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Local development
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+yarn install
+yarn dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Then open the URL printed by Vite (typically http://localhost:5173/Newsmuncher/).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Scripts
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `yarn dev` — start the local dev server
+- `yarn build` — type-check and produce a production build in `dist/`
+- `yarn preview` — preview the production build locally
+
+## Deployment
+
+Pushes to `main` trigger [.github/workflows/deploy.yml](.github/workflows/deploy.yml), which builds the project and publishes `dist/` to GitHub Pages.
