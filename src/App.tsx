@@ -13,6 +13,9 @@ type Story = {
   image: string
   tag: TagId
   readTime: string
+  publisher?: string
+  date?: string
+  time?: string
 }
 
 function TagIcon({ tag }: { tag: TagId }) {
@@ -3534,6 +3537,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy1/800/900',
     tag: 'World',
     readTime: '5 min',
+    publisher: 'Maritime News',
+    date: 'June 2, 2026',
+    time: '10:45 AM'
   },
   // Tech (3)
   {
@@ -3543,6 +3549,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy2/800/900',
     tag: 'Tech',
     readTime: '7 min',
+    publisher: 'TechCrunch',
+    date: 'June 2, 2026',
+    time: '9:30 AM'
   },
   // Politics (3)
   {
@@ -3552,6 +3561,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy3/800/900',
     tag: 'Politics',
     readTime: '6 min',
+    publisher: 'Associated Press',
+    date: 'June 2, 2026',
+    time: '11:15 AM'
   },
   // Sports (3)
   {
@@ -3561,6 +3573,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy4/800/900',
     tag: 'Sports',
     readTime: '4 min',
+    publisher: 'ESPN',
+    date: 'June 2, 2026',
+    time: '1:00 PM'
   },
   {
     id: 'fy5',
@@ -3569,6 +3584,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy5/800/900',
     tag: 'World',
     readTime: '5 min',
+    publisher: 'Wired',
+    date: 'June 2, 2026',
+    time: '2:15 PM'
   },
   {
     id: 'fy6',
@@ -3577,6 +3595,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy6/800/900',
     tag: 'Tech',
     readTime: '9 min',
+    publisher: 'The Verge',
+    date: 'June 2, 2026',
+    time: '3:30 PM'
   },
   {
     id: 'fy7',
@@ -3585,6 +3606,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy7/800/900',
     tag: 'Politics',
     readTime: '8 min',
+    publisher: 'Financial Times',
+    date: 'June 2, 2026',
+    time: '8:00 AM'
   },
   {
     id: 'fy8',
@@ -3593,6 +3617,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy8/800/900',
     tag: 'Sports',
     readTime: '3 min',
+    publisher: "Runner's World",
+    date: 'June 2, 2026',
+    time: '6:45 AM'
   },
   // Third entry per tag — ensures flip always reveals new content
   {
@@ -3602,6 +3629,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy9/800/900',
     tag: 'World',
     readTime: '6 min',
+    publisher: 'Scientific American',
+    date: 'June 2, 2026',
+    time: '12:00 PM'
   },
   {
     id: 'fy10',
@@ -3610,6 +3640,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy10/800/900',
     tag: 'Tech',
     readTime: '8 min',
+    publisher: 'TechCrunch',
+    date: 'June 2, 2026',
+    time: '4:15 PM'
   },
   {
     id: 'fy11',
@@ -3618,6 +3651,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy11/800/900',
     tag: 'Politics',
     readTime: '5 min',
+    publisher: 'Bloomberg',
+    date: 'June 2, 2026',
+    time: '7:30 AM'
   },
   {
     id: 'fy12',
@@ -3626,6 +3662,9 @@ const FOR_YOU_DECK: Story[] = [
     image: 'https://picsum.photos/seed/nm-fy12/800/900',
     tag: 'Sports',
     readTime: '4 min',
+    publisher: 'Sky Sports',
+    date: 'June 2, 2026',
+    time: '10:00 AM'
   },
 ]
 
@@ -3637,6 +3676,9 @@ const FEED: Story[] = [
     image: 'https://picsum.photos/seed/newsmuncher-feed1/800/450',
     tag: 'World',
     readTime: '5 min',
+    publisher: 'Bloomberg',
+    date: 'June 2, 2026',
+    time: '9:00 AM'
   },
   {
     id: 'f2',
@@ -3645,6 +3687,9 @@ const FEED: Story[] = [
     image: 'https://picsum.photos/seed/newsmuncher-feed2/800/450',
     tag: 'Politics',
     readTime: '6 min',
+    publisher: 'Reuters',
+    date: 'June 2, 2026',
+    time: '8:45 AM'
   },
   {
     id: 'f3',
@@ -3653,6 +3698,9 @@ const FEED: Story[] = [
     image: 'https://picsum.photos/seed/newsmuncher-feed3/800/450',
     tag: 'Sports',
     readTime: '3 min',
+    publisher: 'PGA Tour',
+    date: 'June 2, 2026',
+    time: '3:30 PM'
   },
   {
     id: 'f4',
@@ -3661,6 +3709,9 @@ const FEED: Story[] = [
     image: 'https://picsum.photos/seed/newsmuncher-feed4/800/450',
     tag: 'Tech',
     readTime: '8 min',
+    publisher: 'TechCrunch',
+    date: 'June 2, 2026',
+    time: '11:15 AM'
   },
   {
     id: 'f5',
@@ -3669,6 +3720,9 @@ const FEED: Story[] = [
     image: 'https://picsum.photos/seed/newsmuncher-feed5/800/450',
     tag: 'World',
     readTime: '12 min',
+    publisher: 'Columbia Journalism Review',
+    date: 'June 2, 2026',
+    time: '6:00 AM'
   },
 ]
 
@@ -4485,8 +4539,29 @@ function FeedScreen({
 
               {/* Bottom info */}
               <div className="feed-card__info">
-                <p className="feed-card__meta-line">@trending · 20 Apr 2026, {shownStory.readTime}</p>
+                <p className="feed-card__meta-line">@trending · {shownStory.readTime}</p>
                 <h3 className="feed-card__title">{shownStory.title}</h3>
+                
+                {/* Publisher, Date & Time, Share Icon row */}
+                <div className="feed-card__metadata-row">
+                  <span className="feed-card__pub-name">{shownStory.publisher || 'Reuters'}</span>
+                  <span className="feed-card__dot">·</span>
+                  <span className="feed-card__pub-date">{shownStory.date || 'June 2, 2026'} · {shownStory.time || '10:00 AM'}</span>
+                  <span className="feed-card__dot">·</span>
+                  <button
+                    type="button"
+                    className="feed-card__inline-share"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigator.clipboard.writeText(window.location.href)
+                      alert(`Copied link to share: "${shownStory.title}"`)
+                    }}
+                    aria-label="Share story"
+                  >
+                    <IconShare />
+                  </button>
+                </div>
+
                 <p className="feed-card__dek">{shownStory.dek}</p>
                 
                 <div className="feed-card__cta-row">
@@ -4496,9 +4571,6 @@ function FeedScreen({
                     </button>
                     <button type="button" className="feed-card__action-btn" aria-label="Dislike story">
                       <IconDislike />
-                    </button>
-                    <button type="button" className="feed-card__action-btn" aria-label="Share story">
-                      <IconShare />
                     </button>
                     <button type="button" className="feed-card__action-btn" aria-label="View comments">
                       <IconComment />
@@ -9250,32 +9322,175 @@ function FinanceScreen() {
   )
 }
 
+/* ── Categories page datasets ─────────────────────── */
+const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  world: "Global dispatches, critical updates, and perspectives from every corner.",
+  business: "Corporate strategies, market shakeups, and the future of enterprise.",
+  technology: "Deep-dives into AI, hardware breakthroughs, and digital sovereignty.",
+  sports: "Tactical breakdowns, tournament records, and player stories.",
+  science: "From quantum anomalies to molecular engineering breakthroughs.",
+  health: "Wellness science, medical breakthroughs, and longevity protocols.",
+  arts: "Curated movements in photography, heritage, and modern literature.",
+  entertainment: "Streaming battles, silver screen reviews, and box office trends.",
+  travel: "Sustainable journeys, hidden destinations, and aviation policy.",
+  food: "Fine dining innovations, culinary heritage, and food systems.",
+  politics: "Policy debates, electoral counts, and voter sentiment shifts.",
+  education: "EdTech evolution, university research, and student policies.",
+  finance: "Market updates, crypto volatility, and macroeconomic shifts.",
+  space: "Mars colonization efforts, satellite arrays, and exoplanet searches.",
+  climate: "Carbon capture models, clean grids, and ecological policies.",
+  gaming: "Console wars, esports rankings, and indie developers in focus.",
+}
+
+const SUB_CATEGORIES: Record<string, string[]> = {
+  world: ['Global Trade', 'Diplomacy', 'Europe', 'Asia-Pacific', 'Middle East', 'Americas', 'Africa', 'United Nations', 'Geopolitics', 'Human Rights', 'Global Health', 'Conflict Zones', 'Alliances', 'Foreign Aid', 'Borders'],
+  business: ['Startups', 'Retail & Consumer', 'M&A', 'Real Estate', 'Gig Economy', 'Regulation', 'E-commerce', 'Supply Chains', 'Corporate Governance', 'Productivity', 'Marketing', 'Logistics', 'Enterprise Tech', 'Labor Unions', 'Franchising'],
+  technology: ['Artificial Intelligence', 'Cybersecurity', 'Semiconductors', 'SaaS', 'Web3', 'Gadgets', 'Quantum Computing', 'Cloud Infrastructure', 'Robotics', 'Virtual Reality', 'Biotechnology', 'Telecommunications', 'Open Source', 'Data Privacy', 'Green Tech'],
+  sports: ['Football / Soccer', 'Basketball', 'Motorsport & F1', 'Tennis', 'Athletics', 'Golf', 'Cricket', 'Baseball', 'American Football', 'Olympics', 'Extreme Sports', 'Sports Analytics', 'Esports', 'Nutrition & Training', 'Rugby'],
+  science: ['Space Exploration', 'Biotech', 'Genetics', 'Neuroscience', 'Quantum Physics', 'Climate Science', 'Evolutionary Biology', 'Chemistry', 'Astronomy', 'Material Science', 'Paleontology', 'Oceanography', 'Mathematics', 'Particle Physics', 'Virology'],
+  health: ['Wellness & Mind', 'Nutrition', 'Public Health', 'Longevity', 'Mental Health', 'Medical Tech', 'Fitness & Training', 'Sleep Science', 'Preventative Care', 'Pharmaceuticals', 'Pediatrics', 'Chronic Illness', 'Biohacking', 'Alternative Medicine', 'Dental Care'],
+  arts: ['Modern Art', 'Literature', 'Theater & Stage', 'Photography', 'Architecture', 'Heritage', 'Sculpture', 'Design & Typography', 'Art History', 'Classical Music', 'Museums', 'Performing Arts', 'Galleries', 'Poetry', 'Cultural Festivals'],
+  entertainment: ['Streaming Wars', 'Box Office', 'Pop Music', 'Celebrity Culture', 'Indie Cinema', 'Gaming Industry', 'Podcasting', 'Television', 'Anime & Manga', 'Live Concerts', 'Standup Comedy', 'Film Festivals', 'Award Shows', 'Reality TV', 'Vlogging'],
+  travel: ['Eco Tourism', 'Hotels & Resorts', 'Adventure Travel', 'Airline News', 'Solo Journeys', 'City Guides', 'Backpacking', 'Luxury Travel', 'Cruises', 'Road Trips', 'Travel Gear', 'Visa & Customs', 'Train Travel', 'Heritage Sites', 'Hidden Gems'],
+  food: ['Café Culture', 'Fine Dining', 'Baking & Pastry', 'Wine & Spirits', 'Street Food', 'Food Systems', 'Craft Beer', 'Vegan & Plant-Based', 'Recipes', 'Food Science', 'Cooking Tech', 'Agriculture', 'Sweets & Desserts', 'Mixology', 'Seafood'],
+  politics: ['Elections 2026', 'Federal Policy', 'Supreme Court', 'Foreign Affairs', 'State Legislate', 'Voter Sentiment', 'Campaign Finance', 'Lobbying', 'Public Opinion', 'Civil Liberties', 'Local Councils', 'Immigration Policy', 'Trade Policies', 'Bipartisanship', 'Political Theory'],
+  education: ['EdTech', 'Higher Education', 'Alternative Schools', 'Student Debt', 'Early Learning', 'STEM', 'K-12 Education', 'Online Learning', 'Language Studies', 'Vocational Training', 'Academic Research', 'Special Education', 'Public Schools', 'Scholarships', 'Homeschooling'],
+  finance: ['Stock Markets', 'Cryptocurrency', 'Personal Finance', 'Venture Capital', 'Interest Rates', 'Banking News', 'Commodities', 'Real Estate Investing', 'Taxation', 'Retirement Planning', 'Exchange Rates', 'Fintech', 'Central Banks', 'Mutual Funds', 'Insurance'],
+  space: ['Mars Missions', 'Commercial Spaceflight', 'Astrophotography', 'Exoplanets', 'Satellite Constellations', 'Deep Space', 'Lunar Bases', 'Asteroid Mining', 'Rocket Tech', 'Astronaut Training', 'Space Law', 'Cosmology', 'Space Telescopes', 'Astrobiology', 'Space Debris'],
+  climate: ['Carbon Capture', 'Electric Vehicles', 'Renewables', 'Extreme Weather', 'Policy & Subsidies', 'Conservation', 'Solar Technology', 'Wind Power', 'Ocean Conservation', 'Reforestation', 'Biodiversity', 'Green Hydrogen', 'Circular Economy', 'Grid Modernization', 'Climate Activism'],
+  gaming: ['Esports', 'Console Wars', 'Indie Spotlights', 'Mobile Gaming', 'PC Hardware', 'Game Engines', 'Retro Gaming', 'Virtual Reality', 'Board Games', 'Streamers & Creators', 'Speedrunning', 'Game Design', 'RPG & MMO', 'FPS & Strategy', 'Clubs & Communities'],
+}
+
+const CATEGORY_TAGS = [
+  { id: 'all', name: '✨ All' },
+  { id: 'trending-ai', name: '🔥 AI & Tech', categoryId: 'technology', isTrending: true },
+  { id: 'trending-climate', name: '⚡️ Clean Energy', categoryId: 'climate', isTrending: true },
+  { id: 'trending-finance', name: '📈 Inflation', categoryId: 'finance', isTrending: true },
+  { id: 'trending-sports', name: '⚽️ World Cup', categoryId: 'sports', isTrending: true },
+  { id: 'trending-space', name: '🪐 Space Exploration', categoryId: 'space', isTrending: true },
+  { id: 'world', name: 'World', categoryId: 'world' },
+  { id: 'business', name: 'Business', categoryId: 'business' },
+  { id: 'technology', name: 'Technology', categoryId: 'technology' },
+  { id: 'sports', name: 'Sports', categoryId: 'sports' },
+  { id: 'science', name: 'Science', categoryId: 'science' },
+  { id: 'health', name: 'Health', categoryId: 'health' },
+  { id: 'arts', name: 'Arts & Culture', categoryId: 'arts' },
+  { id: 'entertainment', name: 'Entertainment', categoryId: 'entertainment' },
+  { id: 'travel', name: 'Travel', categoryId: 'travel' },
+  { id: 'food', name: 'Food & Drink', categoryId: 'food' },
+  { id: 'politics', name: 'Politics', categoryId: 'politics' },
+  { id: 'education', name: 'Education', categoryId: 'education' },
+  { id: 'finance', name: 'Finance', categoryId: 'finance' },
+  { id: 'space', name: 'Space', categoryId: 'space' },
+  { id: 'climate', name: 'Climate', categoryId: 'climate' },
+  { id: 'gaming', name: 'Gaming', categoryId: 'gaming' },
+]
+
 /* ── Categories page ──────────────────────────────── */
 function CategoriesPage() {
   const [query, setQuery] = useState('')
-  const filtered = useMemo(
-    () => CATEGORIES.filter(c => c.name.toLowerCase().includes(query.toLowerCase())),
-    [query]
-  )
+  const [activeTagId, setActiveTagId] = useState('all')
+  const [popoverCategory, setPopoverCategory] = useState<Category | null>(null)
+  const [subQuery, setSubQuery] = useState('')
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  // Auto-dismiss toast
+  React.useEffect(() => {
+    if (toastMessage) {
+      const t = setTimeout(() => setToastMessage(null), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [toastMessage])
+
+  // Get active category ID from tag
+  const activeTag = CATEGORY_TAGS.find(t => t.id === activeTagId)
+  const activeCategoryIdFromTag = activeTag?.categoryId || null
+
+  const filtered = useMemo(() => {
+    return CATEGORIES.filter(c => {
+      const matchesSearch = c.name.toLowerCase().includes(query.toLowerCase())
+      const matchesTag = !activeCategoryIdFromTag || c.id === activeCategoryIdFromTag
+      return matchesSearch && matchesTag
+    })
+  }, [query, activeCategoryIdFromTag])
+
+  // Handle clicking on a category tile
+  const handleCategoryClick = (cat: Category) => {
+    setPopoverCategory(cat)
+    setSubQuery('') // Reset sub query when opening new category
+  }
+
+  // Handle clicking a tag
+  const handleTagClick = (tagId: string, categoryId?: string) => {
+    setActiveTagId(tagId)
+    setPopoverCategory(null)
+    setSubQuery('')
+    
+    // Automatically trigger popover on tag click
+    if (categoryId) {
+      const cat = CATEGORIES.find(c => c.id === categoryId)
+      if (cat) {
+        setTimeout(() => {
+          setPopoverCategory(cat)
+          setSubQuery('')
+        }, 100)
+      }
+    }
+  }
+
+  const handleSubCategoryClick = (categoryName: string, subName: string) => {
+    setToastMessage(`Exploring ${subName} under ${categoryName}...`)
+  }
+
+  const filteredSubCategories = useMemo(() => {
+    if (!popoverCategory) return []
+    const list = SUB_CATEGORIES[popoverCategory.id] || []
+    return list.filter(sub => sub.toLowerCase().includes(subQuery.toLowerCase()))
+  }, [popoverCategory, subQuery])
 
   return (
     <section className="cat-page">
-      <div className="cat-search-wrap">
-        <span className="cat-search-icon" aria-hidden>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
-        </span>
-        <input
-          className="cat-search"
-          type="search"
-          placeholder="Search categories…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          aria-label="Search categories"
-        />
+      {/* Top Search Row */}
+      <div className="cat-header-actions">
+        <div className="cat-search-wrap">
+          <span className="cat-search-icon" aria-hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+          </span>
+          <input
+            className="cat-search"
+            type="search"
+            placeholder="Search categories…"
+            value={query}
+            onChange={e => {
+              setQuery(e.target.value)
+              if (activeTagId !== 'all') setActiveTagId('all')
+            }}
+            aria-label="Search categories"
+          />
+        </div>
       </div>
+
+      {/* Horizontal Scrollable Tags Panel */}
+      <div className="cat-tags-panel">
+        {CATEGORY_TAGS.map(tag => {
+          const isActive = tag.id === activeTagId
+          return (
+            <button
+              key={tag.id}
+              type="button"
+              className={`cat-tag-btn ${isActive ? 'cat-tag-btn--active' : ''} ${tag.isTrending ? 'cat-tag-btn--trending' : ''}`}
+              onClick={() => handleTagClick(tag.id, tag.categoryId)}
+            >
+              {tag.name}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Categories Grid */}
       <div className="cat-grid">
         {filtered.map(cat => (
           <button
@@ -9283,6 +9498,7 @@ function CategoriesPage() {
             type="button"
             className={`cat-tile cat-tile--${cat.size}`}
             aria-label={cat.name}
+            onClick={() => handleCategoryClick(cat)}
           >
             <img src={cat.img} alt="" className="cat-tile__img" loading="lazy" />
             <div className="cat-tile__overlay" aria-hidden />
@@ -9290,6 +9506,97 @@ function CategoriesPage() {
           </button>
         ))}
       </div>
+
+      {/* Popover Bottom Sheet Drawer */}
+      {popoverCategory && (
+        <div className="cat-backdrop" onClick={() => setPopoverCategory(null)}>
+          <div className="cat-sheet" onClick={e => e.stopPropagation()}>
+            <div className="cat-sheet__handle-wrap" onClick={() => setPopoverCategory(null)}>
+              <div className="cat-sheet__handle" />
+            </div>
+            
+            <div className="cat-sheet__content">
+              <div className="cat-sheet__header">
+                <div className="cat-sheet__title-group">
+                  <h3 className="cat-sheet__title">{popoverCategory.name}</h3>
+                  <p className="cat-sheet__desc">{CATEGORY_DESCRIPTIONS[popoverCategory.id]}</p>
+                </div>
+                <button
+                  type="button"
+                  className="cat-sheet__close"
+                  onClick={() => setPopoverCategory(null)}
+                  aria-label="Close drawer"
+                >
+                  <IconClose />
+                </button>
+              </div>
+
+              {/* Sub-Category Search Input */}
+              <div className="cat-sheet__search-wrap">
+                <span className="cat-sheet__search-icon" aria-hidden>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                </span>
+                <input
+                  className="cat-sheet__search"
+                  type="search"
+                  placeholder={`Search ${popoverCategory.name} sub-categories…`}
+                  value={subQuery}
+                  onChange={e => setSubQuery(e.target.value)}
+                  aria-label={`Search ${popoverCategory.name} sub-categories`}
+                />
+                {subQuery && (
+                  <button
+                    type="button"
+                    className="cat-sheet__search-clear"
+                    onClick={() => setSubQuery('')}
+                    aria-label="Clear sub-category search"
+                  >
+                    <IconClose />
+                  </button>
+                )}
+              </div>
+
+              <div className="cat-sheet__image-container">
+                <img src={popoverCategory.img} alt="" className="cat-sheet__img" />
+                <div className="cat-sheet__img-overlay" />
+              </div>
+
+              {filteredSubCategories.length > 0 ? (
+                <div className="cat-sheet__sub-grid">
+                  {filteredSubCategories.map(sub => (
+                    <button
+                      key={sub}
+                      type="button"
+                      className="cat-sheet__chip"
+                      onClick={() => handleSubCategoryClick(popoverCategory.name, sub)}
+                    >
+                      <span>{sub}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="cat-sheet__empty">
+                  <span>No sub-categories match "{subQuery}"</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transient Micro-Toast Notification */}
+      {toastMessage && (
+        <div className="cat-toast" role="status">
+          <span className="cat-toast__icon">✨</span>
+          <span className="cat-toast__message">{toastMessage}</span>
+        </div>
+      )}
     </section>
   )
 }
@@ -10592,6 +10899,27 @@ export default function App() {
                   <div className="feed-card-content">
                     <ArticleTag tag={item.tag} />
                     <h3 className="feed-card-title">{item.title}</h3>
+                    
+                    {/* Publisher, Date & Time, Share Icon row */}
+                    <div className="feed-card-metadata-row">
+                      <span className="feed-card-pub-name">{item.publisher || 'Reuters'}</span>
+                      <span className="feed-card-dot">·</span>
+                      <span className="feed-card-pub-date">{item.date || 'June 2, 2026'} · {item.time || '10:00 AM'}</span>
+                      <span className="feed-card-dot">·</span>
+                      <button
+                        type="button"
+                        className="feed-card-inline-share"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigator.clipboard.writeText(window.location.href)
+                          alert(`Copied link to share: "${item.title}"`)
+                        }}
+                        aria-label="Share story"
+                      >
+                        <IconShare />
+                      </button>
+                    </div>
+
                     <p className="feed-card-dek">{item.dek}</p>
                     <div className="feed-card-foot">
                       <span>{item.readTime}</span>
