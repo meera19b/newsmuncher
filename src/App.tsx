@@ -1,6 +1,7 @@
 import React, { useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 import { createPortal, flushSync } from 'react-dom'
+import { toPng } from 'html-to-image'
 import './App.css'
 
 const CATEGORY_CHIPS = ['World', 'Politics', 'Sports', 'Tech'] as const
@@ -4386,16 +4387,95 @@ function ChronologyModal({ story, onClose }: { story: Story | null; onClose: () 
   )
 }
 
+function IconCamera({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3" />
+    </svg>
+  )
+}
+
+function IconFocus({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+    </svg>
+  )
+}
+
 function FeedScreen({
   prefersReducedMotion,
+  enableFeedCapture,
+  onToggleFullscreen,
 }: {
   prefersReducedMotion: boolean
+  enableFeedCapture: boolean
+  onToggleFullscreen: (isFullscreen: boolean) => void
 }) {
   const deck = FOR_YOU_DECK
   const [idx, setIdx] = useState(0)
   const [flipIdx, setFlipIdx] = useState(0)
   const [cardAnim, setCardAnim] = useState<'idle' | 'flip-out' | 'flip-in'>('idle')
   const [focusedIdx, setFocusedIdx] = useState<number | null>(null)
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
+  // Story being rendered into the off-screen stage for screenshot capture
+  const [captureStory, setCaptureStory] = useState<Story | null>(null)
+  // Match the screenshot to the on-screen card's real dimensions
+  const [captureRect, setCaptureRect] = useState<{ w: number; h: number } | null>(null)
+  const [isCapturing, setIsCapturing] = useState(false)
+  const captureRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    onToggleFullscreen(expandedIdx !== null)
+  }, [expandedIdx, onToggleFullscreen])
+
+  // Restore app chrome (header + nav) when the feed unmounts
+  useEffect(() => () => onToggleFullscreen(false), [onToggleFullscreen])
+
+  // Once the off-screen capture card is in the DOM, rasterize it and download
+  useEffect(() => {
+    if (!captureStory) return
+    const node = captureRef.current
+    if (!node) return
+    let cancelled = false
+    setIsCapturing(true)
+    ;(async () => {
+      try {
+        // Wait for the card image to finish decoding so it isn't blank
+        const img = node.querySelector('img')
+        if (img && !img.complete) {
+          await new Promise<void>((resolve) => {
+            img.addEventListener('load', () => resolve(), { once: true })
+            img.addEventListener('error', () => resolve(), { once: true })
+          })
+        }
+        const dataUrl = await toPng(node, {
+          width: node.offsetWidth,
+          height: node.offsetHeight,
+          pixelRatio: 2,
+          cacheBust: true,
+        })
+        if (cancelled) return
+        const link = document.createElement('a')
+        link.download = `newsmuncher-${captureStory.id}.png`
+        link.href = dataUrl
+        link.click()
+      } catch (err) {
+        console.error('Feed capture failed', err)
+      } finally {
+        if (!cancelled) {
+          setIsCapturing(false)
+          setCaptureStory(null)
+          setCaptureRect(null)
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [captureStory])
+
   const flipBusy = useRef(false)
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
   const stackRef = useRef<HTMLDivElement>(null)
@@ -4502,13 +4582,16 @@ function FeedScreen({
         {deck.map((story, i) => {
           const isActive = i === idx
           const isFocused = i === focusedIdx
+          const isExpanded = i === expandedIdx
+          const isHiddenSibling =
+            (focusedIdx !== null && !isFocused) || (expandedIdx !== null && !isExpanded)
           const shownStory = isActive
             ? (sameTagDeck[flipIdx % sameTagDeck.length] ?? story)
             : story
           return (
             <div
               key={i}
-              className={`feed-card${isActive ? animClass : ''}${isFocused ? ' feed-card--focused' : ''}`}
+              className={`feed-card${isActive ? animClass : ''}${isFocused ? ' feed-card--focused' : ''}${isExpanded ? ' feed-card--expanded' : ''}${isHiddenSibling ? ' feed-card--hidden-sibling' : ''}`}
               ref={el => { cardRefs.current[i] = el }}
             >
               <img src={shownStory.image} alt="" className="feed-card__img" draggable={false} />
@@ -4523,15 +4606,15 @@ function FeedScreen({
               </div>
 
               {/* Collapse button for focused mode */}
-              {isFocused && (
+              {isExpanded && (
                 <button
                   type="button"
                   className="feed-card__collapse"
                   onClick={(e) => {
                     e.stopPropagation()
-                    setFocusedIdx(null)
+                    setExpandedIdx(null)
                   }}
-                  aria-label="Exit focus mode"
+                  aria-label="Exit full screen"
                 >
                   <IconCollapse />
                 </button>
@@ -4575,19 +4658,49 @@ function FeedScreen({
                     <button type="button" className="feed-card__action-btn" aria-label="View comments">
                       <IconComment />
                     </button>
-                    {!isFocused && (
+                    {enableFeedCapture && (
                       <button
                         type="button"
-                        className="feed-card__action-btn feed-card__action-btn--focus"
+                        className="feed-card__action-btn feed-card__action-btn--capture"
                         onClick={(e) => {
                           e.stopPropagation()
-                          setFocusedIdx(i)
+                          if (isCapturing) return
+                          const rect = cardRefs.current[i]?.getBoundingClientRect()
+                          setCaptureRect(rect ? { w: Math.round(rect.width), h: Math.round(rect.height) } : null)
+                          setCaptureStory(shownStory)
                         }}
-                        aria-label="Focus Thread"
+                        disabled={isCapturing}
+                        aria-label="Save card as image"
                       >
-                        <IconExpand />
+                        <IconCamera />
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className={`feed-card__action-btn feed-card__action-btn--focus${isFocused ? ' feed-card__action-btn--active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setExpandedIdx(null)
+                        setFocusedIdx(isFocused ? null : i)
+                      }}
+                      aria-label="Focus thread"
+                      aria-pressed={isFocused}
+                    >
+                      <IconFocus />
+                    </button>
+                    <button
+                      type="button"
+                      className={`feed-card__action-btn feed-card__action-btn--expand${isExpanded ? ' feed-card__action-btn--active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setFocusedIdx(null)
+                        setExpandedIdx(isExpanded ? null : i)
+                      }}
+                      aria-label="Expand to full screen"
+                      aria-pressed={isExpanded}
+                    >
+                      <IconExpand />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -4595,6 +4708,38 @@ function FeedScreen({
           )
         })}
       </div>
+
+      {/* Off-screen stage used only to rasterize a clean card screenshot */}
+      {captureStory && (
+        <div className="feed-capture-stage" aria-hidden>
+          <div
+            className="feed-capture-card"
+            ref={captureRef}
+            style={captureRect ? { width: captureRect.w, height: captureRect.h } : undefined}
+          >
+            <img
+              src={captureStory.image}
+              alt=""
+              className="feed-capture-card__img"
+              crossOrigin="anonymous"
+            />
+            <div className="feed-capture-card__body">
+              <div className="feed-capture-card__tag">
+                <ArticleTag tag={captureStory.tag} />
+              </div>
+              <h3 className="feed-capture-card__title">{captureStory.title}</h3>
+              <p className="feed-capture-card__meta">
+                {(captureStory.publisher || 'Reuters')} · {(captureStory.date || 'June 2, 2026')} · {(captureStory.time || '10:00 AM')}
+              </p>
+              <p className="feed-capture-card__dek">{captureStory.dek}</p>
+              <div className="feed-capture-card__foot">
+                <span className="feed-capture-card__brand">Newsmuncher</span>
+                <span className="feed-capture-card__read">{captureStory.readTime}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -10214,6 +10359,22 @@ function useBrand() {
   return { brand, setBrand }
 }
 
+const FEED_CAPTURE_KEY = 'nm_feed_capture'
+
+/** Persisted toggle for the "Feed Capture" feature (screenshot a feed card). */
+function useFeedCapture() {
+  const [feedCapture, setFeedCaptureState] = useState<boolean>(() => {
+    try { return localStorage.getItem(FEED_CAPTURE_KEY) === '1' } catch { return false }
+  })
+
+  const setFeedCapture = useCallback((on: boolean) => {
+    setFeedCaptureState(on)
+    try { localStorage.setItem(FEED_CAPTURE_KEY, on ? '1' : '0') } catch { /* ignore */ }
+  }, [])
+
+  return { feedCapture, setFeedCapture }
+}
+
 /** Lightning-Z glyph lifted from /public/favicon.svg, simplified for inline use. */
 function BitstaleMark({ size = 22 }: { size?: number }) {
   const uid = useId().replace(/:/g, '')
@@ -10377,6 +10538,8 @@ function MenuSheet({
   onSelectPalette,
   brand,
   onSelectBrand,
+  feedCapture,
+  onToggleFeedCapture,
   weather,
   regionName,
   onClose,
@@ -10387,6 +10550,8 @@ function MenuSheet({
   onSelectPalette: (id: string) => void
   brand: BrandId
   onSelectBrand: (b: BrandId) => void
+  feedCapture: boolean
+  onToggleFeedCapture: (on: boolean) => void
   weather: HeaderWeather
   regionName: string
   onClose: () => void
@@ -10444,6 +10609,23 @@ function MenuSheet({
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="menu-section">
+            <p className="menu-section__label">Feed</p>
+            <div className="fin-switch-row">
+              <span className="fin-switch__label">Feed capture</span>
+              <button
+                type="button"
+                className={`fin-switch${feedCapture ? ' fin-switch--on' : ''}`}
+                onClick={() => onToggleFeedCapture(!feedCapture)}
+                aria-pressed={feedCapture}
+                aria-label="Toggle feed capture"
+              >
+                <span className="fin-switch__slider" />
+              </button>
+            </div>
+            <p className="menu-section__hint">Adds a camera button on each feed card to save it as an image.</p>
           </section>
 
           <section className="menu-section">
@@ -10558,6 +10740,7 @@ export default function App() {
   const [showFinance, setShowFinance] = useState(false)
   const [readStory, setReadStory] = useState<Story | null>(null)
   const [chronologyStory, setChronologyStory] = useState<Story | null>(null)
+  const [feedFullscreen, setFeedFullscreen] = useState(false)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const heroSlideRefs = useRef<(HTMLDivElement | null)[]>([])
   const prefersReducedMotion = usePrefersReducedMotion()
@@ -10566,6 +10749,7 @@ export default function App() {
   const { getReaction, setReaction, getRefinement, setRefinement } = useReactions()
   const { theme, setTheme, paletteId, setPaletteId } = useTheme()
   const { brand, setBrand } = useBrand()
+  const { feedCapture, setFeedCapture } = useFeedCapture()
   const [showMenuSheet, setShowMenuSheet] = useState(false)
 
   const setHeroSlideRef = useCallback((index: number) => (el: HTMLDivElement | null) => {
@@ -10627,6 +10811,7 @@ export default function App() {
 
   return (
     <div className="shell">
+      {!feedFullscreen && (
       <header className={`header${detailStory ? ' header--detail' : ''}`}>
         <div className="header-row">
           {detailStory ? (
@@ -10703,8 +10888,9 @@ export default function App() {
           )}
         </div>
       </header>
+      )}
 
-      <main className={`main${detailStory ? ' main--detail' : (showBookmarks || showFinance || nav !== 'home') ? ' main--single' : ''}${nav === 'foryou' && !detailStory && !showBookmarks && !showFinance ? ' main--feed' : ''}${showFinance ? ' main--finance' : ''}`}>
+      <main className={`main${detailStory ? ' main--detail' :(showBookmarks || showFinance || nav !== 'home') ? ' main--single' : ''}${nav === 'foryou' && !detailStory && !showBookmarks && !showFinance ? ' main--feed' : ''}${showFinance ? ' main--finance' : ''}`}>
         {detailStory && (
           <NewsDetailScreen
             story={detailStory}
@@ -10955,7 +11141,7 @@ export default function App() {
         )}
 
         {!detailStory && !showBookmarks && !showFinance && nav === 'foryou' && (
-          <FeedScreen prefersReducedMotion={prefersReducedMotion} />
+          <FeedScreen prefersReducedMotion={prefersReducedMotion} enableFeedCapture={feedCapture} onToggleFullscreen={setFeedFullscreen} />
         )}
 
         {!detailStory && !showBookmarks && !showFinance && nav === 'category' && <CategoriesPage />}
@@ -10992,6 +11178,8 @@ export default function App() {
           onSelectPalette={setPaletteId}
           brand={brand}
           onSelectBrand={setBrand}
+          feedCapture={feedCapture}
+          onToggleFeedCapture={setFeedCapture}
           weather={headerWeather}
           regionName={selectedRegion.name}
           onClose={() => setShowMenuSheet(false)}
@@ -11002,7 +11190,7 @@ export default function App() {
       <ShortsStack story={null} onClose={() => {}} prefersReducedMotion={prefersReducedMotion} />
       <ChronologyModal story={chronologyStory} onClose={() => setChronologyStory(null)} />
 
-      {!showFinance && (
+      {!showFinance && !feedFullscreen && (
       <nav className="bottom-nav" aria-label="Primary">
         <button type="button" className={`nav-item ${nav === 'home' ? 'nav-item--active' : ''}`} onClick={() => setNav('home')}>
           <IconHome active={nav === 'home'} />

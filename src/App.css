@@ -1596,16 +1596,43 @@ html[data-theme='anime'] .app-footer__icon {
 
 .feed-card--focused {
   position: fixed !important;
-  top: 12px !important;
-  left: 12px !important;
-  right: 12px !important;
-  bottom: 12px !important;
-  z-index: 1000;
-  width: auto !important;
+  /* Sits between the header and the nav so both stay visible during focus */
+  top: calc(var(--header-h) + 12px) !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: calc(100% - 24px) !important;
+  max-width: 406px !important;
+  bottom: calc(var(--nav-h) + 12px) !important;
+  z-index: 15;
   height: auto !important;
   min-height: 0 !important;
-  max-width: none !important;
   border-radius: 20px !important;
+  border: 1px solid var(--border) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scroll-snap-align: none !important;
+  background: var(--bg);
+  box-shadow: var(--shadow-lg);
+  animation: cardExpand 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Expanded mode: near full-screen card, inset with padding + rounded corners */
+.feed-card--expanded {
+  position: fixed !important;
+  top: max(16px, env(safe-area-inset-top)) !important;
+  bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: calc(100% - 32px) !important;
+  max-width: 398px !important;
+  z-index: 1000;
+  height: auto !important;
+  min-height: 0 !important;
+  border-radius: 24px !important;
   border: 1px solid var(--border) !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -1619,10 +1646,57 @@ html[data-theme='anime'] .app-footer__icon {
   animation: cardExpand 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+.feed-card--expanded .feed-card__img {
+  position: relative !important;
+  width: 100% !important;
+  height: 48vh !important;
+  object-fit: cover !important;
+  display: block !important;
+  border-radius: 0 !important;
+}
+
+.feed-card--expanded .feed-card__info {
+  position: relative !important;
+  top: auto !important;
+  max-height: none !important;
+  padding: 24px 20px 32px !important;
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  border-top: 0 !important;
+  pointer-events: auto !important;
+  overflow: visible !important;
+}
+
+/* No action toolbar in expanded mode — only the content + collapse button */
+.feed-card--expanded .feed-card__cta-row {
+  display: none !important;
+}
+
+/* Hide the "BRANCH REEL" pill so the top-left collapse button sits cleanly */
+.feed-card--expanded .feed-card__top {
+  display: none !important;
+}
+
+.feed-card--expanded .feed-card__dek {
+  font-size: 0.95rem !important;
+  line-height: 1.55 !important;
+  display: block !important;
+  flex: 0 1 auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
 @keyframes cardExpand {
-  0%   { transform: scale(0.88); opacity: 0.35; }
+  0%   { transform: translateX(-50%) scale(0.88); opacity: 0.35; }
   60%  { opacity: 1; }
-  100% { transform: scale(1);    opacity: 1; }
+  100% { transform: translateX(-50%) scale(1);    opacity: 1; }
+}
+
+.feed-card--hidden-sibling {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Card image — top 40% of the card */
@@ -1735,6 +1809,19 @@ html[data-theme='anime'] .app-footer__icon {
   border-color: var(--blue);
 }
 
+.feed-card__action-btn--expand {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  box-shadow: var(--shadow-lg);
+}
+
+.feed-card__action-btn--expand:hover {
+  background: var(--blue);
+  filter: brightness(1.1);
+  border-color: var(--blue);
+}
+
 /* Bottom text region — fills the remaining 60% under the image */
 .feed-card__info {
   position: absolute;
@@ -1753,52 +1840,119 @@ html[data-theme='anime'] .app-footer__icon {
   pointer-events: auto;
 }
 
-.feed-card--focused .feed-card__info {
-  position: relative;
-  top: auto;
-  max-height: none;
-  padding: 24px 20px calc(40px + env(safe-area-inset-bottom));
-  background: var(--bg);
+/*
+ * Focus mode is a "spotlight": the card is centered between the header and nav
+ * with the peeking sibling hidden and a dimmed backdrop, but its internal layout
+ * stays exactly the same as a normal card — it does NOT expand into a reading view.
+ * (Use Expand for the full-screen reading view.) So no per-element overrides here.
+ */
+
+.feed-card__action-btn--capture {
+  background: var(--surface);
+  border-color: var(--border);
   color: var(--text);
-  border-top: 0;
-  pointer-events: auto;
-  overflow: visible;
 }
 
-.feed-card--focused .feed-card__img {
-  position: relative;
+.feed-card__action-btn--capture:hover {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+/* —— Feed capture: off-screen card rasterized to a downloadable PNG —— */
+.feed-capture-stage {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 1;
+}
+
+/* Mirrors the on-screen feed card: image on top ~40%, content fills the rest.
+   width/height are set inline from the real card's measured rect so the
+   downloaded image has the exact same shape. */
+.feed-capture-card {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1.2px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: none;
+  font-family: inherit;
+  color: var(--text);
+}
+
+.feed-capture-card__img {
+  display: block;
   width: 100%;
-  height: 48vh;
-  object-fit: cover;
-  display: block;
-}
-
-.feed-card--focused .feed-card__top {
-  top: 14px;
-  left: 14px;
-  right: 14px;
-  padding: 0;
-}
-
-.feed-card--focused .feed-card__title {
-  font-size: 1.4rem;
-  line-height: 1.22;
-}
-
-/* Focus mode: full text, no clamp, no action buttons */
-.feed-card--focused .feed-card__dek {
-  font-size: 0.95rem;
-  line-height: 1.55;
-  display: block;
-  flex: 0 1 auto;
+  flex: 0 0 40%;
   min-height: 0;
-  overflow: visible;
-  -webkit-mask-image: none;
-          mask-image: none;
+  object-fit: cover;
 }
 
-.feed-card--focused .feed-card__cta-row {
-  display: none;
+.feed-capture-card__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.feed-capture-card__tag {
+  display: flex;
+}
+
+.feed-capture-card__title {
+  margin: 0;
+  font-size: 1.18rem;
+  line-height: 1.22;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.feed-capture-card__meta {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.feed-capture-card__dek {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.feed-capture-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.feed-capture-card__brand {
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--blue);
+}
+
+.feed-capture-card__read {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .feed-card__meta-line {
@@ -1877,7 +2031,9 @@ html[data-theme='anime'] .app-footer__icon {
   font-size: 0.88rem;
   color: var(--text);
   line-height: 1.5;
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1906,8 +2062,8 @@ html[data-theme='anime'] .app-footer__icon {
 
 .feed-card__collapse {
   position: fixed;
-  top: 14px;
-  right: 14px;
+  top: max(24px, calc(env(safe-area-inset-top) + 12px));
+  left: 24px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -3049,14 +3205,52 @@ html[data-theme='anime'] .app-footer__icon {
 
 .cat-header-actions {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
 .cat-search-wrap {
+  flex: 1;
   position: relative;
   margin-bottom: 0;
+}
+
+/* Segmented Toggle Switcher */
+.cat-mode-selector {
+  flex-shrink: 0;
+}
+
+.cat-mode-segmented {
+  display: inline-flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px;
+  box-shadow: var(--shadow-sm);
+}
+
+.cat-mode-btn {
+  border: none;
+  background: transparent;
+  padding: 5px 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 18px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cat-mode-btn:hover {
+  color: var(--text);
+}
+
+.cat-mode-btn--active {
+  background: var(--blue);
+  color: #fff !important;
+  box-shadow: var(--shadow-sm);
 }
 
 .cat-search-icon {
@@ -3220,6 +3414,194 @@ html[data-theme='anime'] .app-footer__icon {
 
 .cat-tile--tall .cat-tile__name {
   font-size: 0.88rem;
+}
+
+/* Expanded Tile & Inline Sub-categories Panel */
+.cat-tile--expanded {
+  grid-column: span 2 !important;
+  grid-row: span 3 !important;
+  height: auto !important;
+  min-height: 280px;
+  cursor: default;
+}
+
+.cat-tile--expanded .cat-tile__img {
+  filter: blur(4px) brightness(0.5);
+  transform: scale(1.05) !important;
+}
+
+.cat-tile__expanded-panel {
+  position: absolute;
+  inset: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff;
+  overflow-y: auto;
+  animation: cat-fade-in 0.22s ease-out;
+  box-sizing: border-box;
+}
+
+.cat-tile__expanded-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cat-tile__expanded-title-group {
+  flex: 1;
+}
+
+.cat-tile__expanded-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.cat-tile__expanded-desc {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.cat-tile__expanded-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: all 0.2s;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.cat-tile__expanded-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.cat-tile__expanded-close:active {
+  transform: scale(0.9);
+}
+
+.cat-tile__expanded-close svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Inline Search Bar */
+.cat-tile__expanded-search-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.cat-tile__expanded-search-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  pointer-events: none;
+}
+
+.cat-tile__expanded-search {
+  width: 100%;
+  padding: 6px 26px 6px 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.15s, background-color 0.15s;
+  box-sizing: border-box;
+}
+
+.cat-tile__expanded-search:focus {
+  border-color: var(--blue);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cat-tile__expanded-search::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.cat-tile__expanded-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  transition: all 0.15s;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+.cat-tile__expanded-search-clear svg {
+  width: 8px;
+  height: 8px;
+}
+
+/* Inline Chips */
+.cat-tile__expanded-sub-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.cat-tile__sub-chip {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.cat-tile__sub-chip:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.cat-tile__sub-chip:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.cat-tile__expanded-empty {
+  text-align: center;
+  padding: 16px 8px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /* Popover Bottom Sheet Drawer */
@@ -6066,6 +6448,13 @@ html[data-theme='anime'] .app-footer__icon {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.menu-section__hint {
+  margin: 8px 2px 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
   color: var(--text-muted);
 }
 

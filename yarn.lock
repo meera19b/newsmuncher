@@ -1240,6 +1240,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"html-to-image@npm:^1.11.13":
+  version: 1.11.13
+  resolution: "html-to-image@npm:1.11.13"
+  checksum: 10c0/03bd7192d87b99499e37ff12a8e2b41ddce4cf8e33a93dfadff18df0f213434c7f1ba8328db2158f4805da07b7aec3c90aec3152908281153217e86784218b10
+  languageName: node
+  linkType: hard
+
 "ignore@npm:^5.2.0":
   version: 5.3.2
   resolution: "ignore@npm:5.3.2"
@@ -1592,6 +1599,7 @@ __metadata:
     eslint-plugin-react-hooks: "npm:^7.0.1"
     eslint-plugin-react-refresh: "npm:^0.5.2"
     globals: "npm:^17.4.0"
+    html-to-image: "npm:^1.11.13"
     react: "npm:^19.2.4"
     react-dom: "npm:^19.2.4"
     typescript: "npm:~5.9.3"
