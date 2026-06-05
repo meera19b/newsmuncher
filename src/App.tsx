@@ -4421,6 +4421,9 @@ function FeedScreen({
   const [cardAnim, setCardAnim] = useState<'idle' | 'flip-out' | 'flip-in'>('idle')
   const [focusedIdx, setFocusedIdx] = useState<number | null>(null)
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
+  // Drives the exit animation so collapsing animates instead of snapping shut
+  const [expandClosing, setExpandClosing] = useState(false)
+  const expandCloseTimer = useRef<number | null>(null)
   // Story being rendered into the off-screen stage for screenshot capture
   const [captureStory, setCaptureStory] = useState<Story | null>(null)
   const [isCapturing, setIsCapturing] = useState(false)
@@ -4559,6 +4562,22 @@ function FeedScreen({
     if (adx > 35 && adx > ady && dx < 0) goSimilar()
   }, [goSimilar])
 
+  // Run the collapse animation, then actually unmount the expanded state
+  const collapseExpanded = () => {
+    if (expandClosing) return
+    setExpandClosing(true)
+    if (expandCloseTimer.current) window.clearTimeout(expandCloseTimer.current)
+    expandCloseTimer.current = window.setTimeout(() => {
+      setExpandedIdx(null)
+      setExpandClosing(false)
+      expandCloseTimer.current = null
+    }, 260)
+  }
+
+  useEffect(() => () => {
+    if (expandCloseTimer.current) window.clearTimeout(expandCloseTimer.current)
+  }, [])
+
   const animClass = cardAnim === 'flip-out' ? ' feed-card--flip-out'
     : cardAnim === 'flip-in' ? ' feed-card--flip-in'
     : ''
@@ -4588,7 +4607,7 @@ function FeedScreen({
           return (
             <div
               key={i}
-              className={`feed-card${isActive ? animClass : ''}${isFocused ? ' feed-card--focused' : ''}${isExpanded ? ' feed-card--expanded' : ''}${isHiddenSibling ? ' feed-card--hidden-sibling' : ''}`}
+              className={`feed-card${isActive ? animClass : ''}${isFocused ? ' feed-card--focused' : ''}${isExpanded ? ' feed-card--expanded' : ''}${isExpanded && expandClosing ? ' feed-card--collapsing' : ''}${isHiddenSibling ? ' feed-card--hidden-sibling' : ''}`}
               ref={el => { cardRefs.current[i] = el }}
             >
               <img src={shownStory.image} alt="" className="feed-card__img" draggable={false} />
@@ -4609,7 +4628,7 @@ function FeedScreen({
                   className="feed-card__collapse"
                   onClick={(e) => {
                     e.stopPropagation()
-                    setExpandedIdx(null)
+                    collapseExpanded()
                   }}
                   aria-label="Exit full screen"
                 >
@@ -4688,8 +4707,12 @@ function FeedScreen({
                       className={`feed-card__action-btn feed-card__action-btn--expand${isExpanded ? ' feed-card__action-btn--active' : ''}`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        setFocusedIdx(null)
-                        setExpandedIdx(isExpanded ? null : i)
+                        if (isExpanded) {
+                          collapseExpanded()
+                        } else {
+                          setFocusedIdx(null)
+                          setExpandedIdx(i)
+                        }
                       }}
                       aria-label="Expand to full screen"
                       aria-pressed={isExpanded}
@@ -4703,6 +4726,19 @@ function FeedScreen({
           )
         })}
       </div>
+
+      {/* Capture progress: html-to-image has no progress events, so show an
+          indeterminate bar while the screenshot is being rasterized/saved. */}
+      {isCapturing && (
+        <div className="feed-capture-progress" role="status" aria-live="polite">
+          <div className="feed-capture-progress__panel">
+            <span className="feed-capture-progress__label">Saving screenshot…</span>
+            <div className="feed-capture-progress__track">
+              <span className="feed-capture-progress__bar" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Off-screen stage used only to rasterize a clean "report" screenshot:
           phone-width, height grows to fit so nothing is cropped or clipped. */}
