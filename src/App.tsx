@@ -4423,8 +4423,6 @@ function FeedScreen({
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
   // Story being rendered into the off-screen stage for screenshot capture
   const [captureStory, setCaptureStory] = useState<Story | null>(null)
-  // Match the screenshot to the on-screen card's real dimensions
-  const [captureRect, setCaptureRect] = useState<{ w: number; h: number } | null>(null)
   const [isCapturing, setIsCapturing] = useState(false)
   const captureRef = useRef<HTMLDivElement>(null)
 
@@ -4469,7 +4467,6 @@ function FeedScreen({
         if (!cancelled) {
           setIsCapturing(false)
           setCaptureStory(null)
-          setCaptureRect(null)
         }
       }
     })()
@@ -4665,8 +4662,6 @@ function FeedScreen({
                         onClick={(e) => {
                           e.stopPropagation()
                           if (isCapturing) return
-                          const rect = cardRefs.current[i]?.getBoundingClientRect()
-                          setCaptureRect(rect ? { w: Math.round(rect.width), h: Math.round(rect.height) } : null)
                           setCaptureStory(shownStory)
                         }}
                         disabled={isCapturing}
@@ -4709,14 +4704,11 @@ function FeedScreen({
         })}
       </div>
 
-      {/* Off-screen stage used only to rasterize a clean card screenshot */}
+      {/* Off-screen stage used only to rasterize a clean "report" screenshot:
+          phone-width, height grows to fit so nothing is cropped or clipped. */}
       {captureStory && (
         <div className="feed-capture-stage" aria-hidden>
-          <div
-            className="feed-capture-card"
-            ref={captureRef}
-            style={captureRect ? { width: captureRect.w, height: captureRect.h } : undefined}
-          >
+          <div className="feed-capture-card" ref={captureRef}>
             <img
               src={captureStory.image}
               alt=""
@@ -4732,6 +4724,9 @@ function FeedScreen({
                 {(captureStory.publisher || 'Reuters')} · {(captureStory.date || 'June 2, 2026')} · {(captureStory.time || '10:00 AM')}
               </p>
               <p className="feed-capture-card__dek">{captureStory.dek}</p>
+              {STORY_CONTENT[captureStory.id]?.body && (
+                <p className="feed-capture-card__report">{STORY_CONTENT[captureStory.id].body}</p>
+              )}
               <div className="feed-capture-card__foot">
                 <span className="feed-capture-card__brand">Newsmuncher</span>
                 <span className="feed-capture-card__read">{captureStory.readTime}</span>

@@ -1869,39 +1869,35 @@ html[data-theme='anime'] .app-footer__icon {
   opacity: 1;
 }
 
-/* Mirrors the on-screen feed card: image on top ~40%, content fills the rest.
-   width/height are set inline from the real card's measured rect so the
-   downloaded image has the exact same shape. */
+/* Standalone "report" screenshot: fixed phone width, height grows to fit the
+   content so the full image and full summary are captured — nothing cropped or
+   clipped. Independent of the on-screen card's shape. */
 .feed-capture-card {
-  display: flex;
-  flex-direction: column;
+  display: block;
+  width: 420px;
   box-sizing: border-box;
   background: var(--bg);
   border: 1.2px solid var(--border);
-  border-radius: 20px;
+  border-radius: 24px;
   overflow: hidden;
   box-shadow: none;
   font-family: inherit;
   color: var(--text);
 }
 
+/* Full article image, natural aspect ratio, no cropping. */
 .feed-capture-card__img {
   display: block;
   width: 100%;
-  flex: 0 0 40%;
-  min-height: 0;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
 }
 
 .feed-capture-card__body {
-  flex: 1 1 auto;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px;
-  border-top: 1px solid var(--border);
-  overflow: hidden;
+  gap: 12px;
+  padding: 22px 22px 18px;
 }
 
 .feed-capture-card__tag {
@@ -1910,35 +1906,40 @@ html[data-theme='anime'] .app-footer__icon {
 
 .feed-capture-card__title {
   margin: 0;
-  font-size: 1.18rem;
-  line-height: 1.22;
+  font-size: 1.42rem;
+  line-height: 1.2;
   font-weight: 800;
   color: var(--text);
 }
 
 .feed-capture-card__meta {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-muted);
 }
 
 .feed-capture-card__dek {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.98rem;
   line-height: 1.5;
+  font-weight: 600;
   color: var(--text);
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
+}
+
+.feed-capture-card__report {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-muted);
 }
 
 .feed-capture-card__foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: auto;
-  padding-top: 12px;
+  margin-top: 6px;
+  padding-top: 14px;
   border-top: 1px solid var(--border);
 }
 
